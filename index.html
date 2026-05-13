@@ -1,0 +1,2128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Wardrobe">
+<title>Wardrobe</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --cream:#F5F1EA;--warm:#FDFBF7;--ink:#1A1714;--ink-soft:#3D3935;
+  --ink-muted:#6B6560;--ink-faint:#A09A94;--border:#E4DED6;--border-mid:#C8C0B6;
+  --sage:#6B8F78;--sage-light:#EAF0EC;--sage-dark:#3E5C49;
+  --amber:#C4834A;--amber-light:#FAF0E4;
+  --rose:#B85C5C;--rose-light:#FAE8E8;
+  --r:14px;--rsm:9px;--rpill:999px;
+}
+html{height:100%;}
+body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);min-height:100%;font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;}
+.app{max-width:860px;margin:0 auto;padding:1.5rem 1.25rem 6rem;}
+
+/* HEADER */
+.header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.75rem;padding-bottom:1.25rem;border-bottom:1px solid var(--border);}
+.logo{font-family:'Cormorant Garamond',serif;font-size:26px;font-weight:400;}
+.logo em{font-style:italic;color:var(--ink-muted);}
+.wpill{display:flex;align-items:center;gap:6px;background:var(--warm);border:1px solid var(--border);border-radius:var(--rpill);padding:5px 13px;font-size:12px;color:var(--ink-soft);}
+.wdot{width:6px;height:6px;border-radius:50%;background:var(--sage);flex-shrink:0;}
+
+/* TABS */
+.tabs{display:flex;gap:3px;background:var(--warm);border:1px solid var(--border);border-radius:var(--r);padding:4px;margin-bottom:1.75rem;}
+.tab{flex:1;padding:9px 2px;border-radius:var(--rsm);font-size:11px;color:var(--ink-muted);cursor:pointer;border:none;background:none;font-family:'DM Sans',sans-serif;transition:all .15s;text-align:center;}
+.tab.active{background:var(--ink);color:var(--warm);font-weight:500;}
+.tab:hover:not(.active){color:var(--ink);background:var(--cream);}
+.view{display:none;}.view.active{display:block;}
+
+/* UTILS */
+.loader{text-align:center;padding:3rem;color:var(--ink-faint);font-size:13px;}
+.spinner{width:24px;height:24px;border:2px solid var(--border);border-top-color:var(--sage);border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 12px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.empty-state{text-align:center;padding:3rem 1rem;color:var(--ink-faint);font-size:14px;line-height:1.9;}
+.divider{border:none;border-top:1px solid var(--border);margin:12px 0;}
+.sec-label{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-faint);margin-bottom:7px;}
+.sbadge{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 9px;border-radius:var(--rpill);font-weight:500;}
+.badge-old{background:var(--amber-light);color:var(--amber);}
+.badge-ok{background:var(--sage-light);color:var(--sage-dark);}
+.wear-btn{font-size:11px;font-weight:500;padding:6px 14px;border-radius:var(--rpill);background:var(--ink);color:var(--warm);border:none;cursor:pointer;font-family:'DM Sans',sans-serif;transition:opacity .15s;}
+.wear-btn:hover{opacity:.8;}
+
+/* FLAT-LAY OUTFIT GRID */
+.flatlay{display:grid;grid-template-rows:1fr 1fr;width:100%;border-radius:var(--rsm);overflow:hidden;background:var(--cream);}
+.flatlay-cell{overflow:hidden;display:flex;align-items:center;justify-content:center;background:var(--cream);border:1px solid var(--border);font-size:22px;position:relative;min-height:80px;}
+.flatlay-cell img{width:100%;height:100%;object-fit:contain;}
+.flatlay-more{position:absolute;inset:0;background:rgba(26,23,20,.55);display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:500;}
+.flatlay-sm .flatlay-cell{min-height:16px;font-size:8px;}
+.flatlay-sm .flatlay-cell img{object-fit:cover;}
+
+/* OUTFIT CARD */
+.outfit-card{background:var(--warm);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;cursor:pointer;transition:border-color .15s;position:relative;}
+.outfit-card:hover{border-color:var(--border-mid);}
+.outfit-card-selected{outline:2px solid var(--sage);}
+.outfit-card-foot{display:flex;align-items:center;justify-content:space-between;padding:5px 7px;gap:4px;flex-wrap:wrap;}
+.outfit-card-badges{display:flex;gap:3px;flex-wrap:wrap;}
+
+/* OUTFITS VIEW */
+.outfits-controls{display:flex;gap:8px;margin-bottom:1.25rem;flex-wrap:wrap;align-items:center;}
+.outfits-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;}
+@media(max-width:600px){.outfits-grid{grid-template-columns:repeat(4,1fr);gap:4px;}}
+
+/* OUTFIT DETAIL SCREEN */
+.detail-screen{display:none;position:fixed;inset:0;background:var(--cream);z-index:90;overflow-y:auto;padding:1.5rem 1.25rem 4rem;}
+.detail-screen.open{display:block;}
+.detail-back{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--ink-muted);cursor:pointer;margin-bottom:1.5rem;border:none;background:none;font-family:'DM Sans',sans-serif;}
+.detail-title{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:400;margin-bottom:1.25rem;}
+.detail-actions{display:flex;gap:8px;margin-top:1.5rem;}
+.btn-outline{flex:1;padding:11px;border-radius:var(--rsm);border:1px solid var(--border);background:none;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif;color:var(--ink-soft);}
+.btn-dark{flex:2;padding:11px;border-radius:var(--rsm);border:none;background:var(--ink);color:var(--warm);font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;}
+.btn-danger{padding:11px 14px;border-radius:var(--rsm);border:1px solid var(--rose-light);background:var(--rose-light);color:var(--rose);font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif;}
+
+/* ACC SUMMARY IN DETAIL */
+.acc-summary-grid{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:6px;}
+.acc-summary-thumb{width:50px;height:50px;border-radius:var(--rsm);border:1px solid var(--border);background:var(--cream);overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:18px;}
+.acc-summary-thumb img{width:100%;height:100%;object-fit:contain;}
+
+/* EDIT ACC SCREEN */
+.edit-acc-screen{display:none;position:fixed;inset:0;background:var(--cream);z-index:95;overflow-y:auto;padding:1.5rem 1.25rem 4rem;}
+.edit-acc-screen.open{display:block;}
+.edit-acc-back{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--ink-muted);cursor:pointer;margin-bottom:1.5rem;border:none;background:none;font-family:'DM Sans',sans-serif;}
+.edit-acc-title{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:400;margin-bottom:1.25rem;}
+.acc-edit-cat{margin-bottom:1.25rem;}
+.acc-edit-cat-header{cursor:pointer;display:flex;align-items:center;gap:6px;user-select:none;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-faint);margin-bottom:8px;padding:6px 0;}
+.acc-edit-cat-header:hover{color:var(--ink);}
+.acc-edit-options{display:flex;gap:8px;flex-wrap:wrap;display:none;}
+.acc-edit-options.open{display:flex;}
+.acc-edit-item{display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;}
+.acc-edit-thumb{width:60px;height:60px;border-radius:var(--rsm);background:var(--warm);border:2px solid var(--border);overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:24px;transition:border-color .15s;}
+.acc-edit-thumb img{width:100%;height:100%;object-fit:contain;}
+.acc-edit-item.linked .acc-edit-thumb{border-color:var(--sage);box-shadow:0 0 0 1px var(--sage);}
+.acc-edit-item.greyed{opacity:.3;pointer-events:none;}
+.acc-edit-save-btn{width:100%;padding:13px;border-radius:var(--rsm);background:var(--ink);color:var(--warm);border:none;font-size:14px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;margin-top:1.5rem;}
+
+/* WEARING FLOW */
+.wearing-screen{display:none;position:fixed;inset:0;background:var(--cream);z-index:95;overflow-y:auto;padding:1.5rem 1.25rem 4rem;}
+.wearing-screen.open{display:block;}
+.wearing-back{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--ink-muted);cursor:pointer;margin-bottom:1.5rem;border:none;background:none;font-family:'DM Sans',sans-serif;}
+.wearing-title{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:400;margin-bottom:1.5rem;}
+.wearing-core{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:1.5rem;}
+.wearing-piece-thumb{width:70px;height:70px;border-radius:var(--rsm);background:var(--warm);border:1px solid var(--border);overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:28px;}
+.wearing-piece-thumb img{width:100%;height:100%;object-fit:contain;}
+.acc-cat-section{margin-bottom:1.25rem;}
+.acc-cat-title{font-size:12px;font-weight:500;color:var(--ink-soft);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em;}
+.acc-options{display:flex;gap:8px;flex-wrap:wrap;}
+.acc-option{display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;}
+.acc-option-thumb{width:60px;height:60px;border-radius:var(--rsm);background:var(--warm);border:2px solid var(--border);overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:24px;transition:border-color .15s;}
+.acc-option-thumb img{width:100%;height:100%;object-fit:contain;}
+.acc-option.selected .acc-option-thumb{border-color:var(--sage);}
+.date-pick-section{margin-top:1.5rem;margin-bottom:0;}
+.date-pick-label{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-faint);margin-bottom:7px;}
+.date-input{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:var(--rsm);font-size:14px;font-family:'DM Sans',sans-serif;background:var(--warm);color:var(--ink);outline:none;}
+#date-pick-screen .wearing-title{font-size:18px;margin-bottom:1rem;}
+#date-pick-screen .confirm-btn{margin-top:.75rem;}
+.confirm-btn{width:100%;padding:13px;border-radius:var(--rsm);background:var(--ink);color:var(--warm);border:none;font-size:14px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;margin-top:1rem;}
+
+/* WARDROBE — 4 per row on mobile */
+.wcontrols{display:flex;align-items:center;gap:8px;margin-bottom:1.25rem;flex-wrap:wrap;}
+.searchbox{flex:1;min-width:130px;padding:9px 12px;border:1px solid var(--border);border-radius:var(--rsm);font-size:13px;background:var(--warm);color:var(--ink);font-family:'DM Sans',sans-serif;outline:none;}
+.catfilter{display:flex;gap:4px;flex-wrap:wrap;}
+.catbtn{padding:6px 11px;border-radius:var(--rpill);border:1px solid var(--border);background:var(--warm);font-size:12px;color:var(--ink-muted);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s;}
+.catbtn.active{background:var(--ink);color:var(--warm);border-color:var(--ink);}
+.addbtn{padding:9px 16px;border-radius:var(--rsm);background:var(--sage);color:#fff;border:none;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;}
+.addbtn:hover{background:var(--sage-dark);}
+.items-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+.icard{background:var(--warm);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;cursor:pointer;transition:border-color .15s,transform .1s;}
+.icard.icard-unavailable{opacity:.35;}
+.icard.icard-unavailable .iimg{filter:grayscale(.6);}
+.iimg{width:100%;aspect-ratio:1;background:var(--cream);display:flex;align-items:center;justify-content:center;font-size:38px;overflow:hidden;}
+.iimg img{width:100%;height:100%;object-fit:contain;}
+.imeta{padding:6px 8px;}
+.iworn{font-size:10px;color:var(--ink-faint);}
+.accordion-header{cursor:pointer;display:flex;align-items:center;gap:6px;user-select:none;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-faint);margin-bottom:8px;}
+.accordion-header:hover{color:var(--ink);}
+.acc-count-pill{font-size:10px;color:var(--ink-faint);background:var(--cream);border:1px solid var(--border);border-radius:var(--rpill);padding:1px 7px;}
+.acc-arrow{font-size:10px;color:var(--ink-faint);margin-left:auto;}
+
+/* BUILD */
+.blayout{display:grid;grid-template-columns:1fr 280px;gap:1.5rem;}
+@media(max-width:660px){.blayout{grid-template-columns:1fr;}}
+.bsection{margin-bottom:1.5rem;}
+.bsec-title{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-faint);margin-bottom:8px;}
+.tgrid{display:flex;gap:6px;flex-wrap:wrap;}
+.titem{display:flex;align-items:center;justify-content:center;padding:4px;border:1px solid var(--border);border-radius:var(--rsm);background:var(--warm);cursor:pointer;transition:all .15s;}
+.mthumb{width:56px;height:56px;border-radius:6px;background:var(--cream);overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:24px;}
+.mthumb img{width:100%;height:100%;object-fit:contain;}
+.titem:hover{border-color:var(--border-mid);}
+.titem.active{background:var(--sage-light);border-color:var(--sage);}
+.preview-panel{background:var(--warm);border:1px solid var(--border);border-radius:var(--r);padding:1.25rem;position:sticky;top:1rem;}
+.prev-title{font-family:'Cormorant Garamond',serif;font-size:17px;font-weight:400;margin-bottom:3px;}
+.prev-num{font-size:11px;color:var(--ink-faint);margin-bottom:12px;}
+.prev-pieces{min-height:40px;margin-bottom:12px;}
+.prev-pieces .flatlay{max-height:120px;}
+.prev-pieces .flatlay-cell{min-height:40px;font-size:14px;}
+@media(max-width:660px){.prev-pieces .flatlay{max-height:90px;}.prev-pieces .flatlay-cell{min-height:28px;font-size:11px;}}
+.prev-empty{font-size:12px;color:var(--ink-faint);font-style:italic;text-align:center;padding:1.5rem 0;}
+.wtag{padding:4px 10px;border-radius:var(--rpill);border:1px solid var(--border);font-size:11px;color:var(--ink-muted);cursor:pointer;background:var(--cream);transition:all .15s;font-family:'DM Sans',sans-serif;}
+.wtag.active{background:var(--ink);color:var(--warm);border-color:var(--ink);}
+.tag-row{display:flex;gap:4px;flex-wrap:wrap;}
+.tag-group{margin-bottom:8px;}
+.tg-name{font-size:11px;color:var(--ink-muted);margin-bottom:4px;}
+.acc-photo-grid{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:8px;}
+.acc-photo-item{display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;}
+.acc-photo-thumb{width:54px;height:54px;border-radius:var(--rsm);border:2px solid var(--border);background:var(--cream);overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:20px;transition:border-color .15s;}
+.acc-photo-thumb img{width:100%;height:100%;object-fit:contain;}
+.acc-photo-item.linked .acc-photo-thumb{border-color:var(--sage);box-shadow:0 0 0 1px var(--sage);}
+.acc-photo-item.greyed{opacity:.3;pointer-events:none;}
+.save-btn{width:100%;padding:11px;border-radius:var(--rsm);background:var(--ink);color:var(--warm);border:none;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;margin-top:12px;}
+.save-btn:disabled{opacity:.35;cursor:not-allowed;}
+
+/* CALENDAR */
+.cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;}
+.cal-nav-btn{background:none;border:1px solid var(--border);border-radius:var(--rsm);padding:6px 12px;cursor:pointer;font-size:14px;color:var(--ink-soft);font-family:'DM Sans',sans-serif;}
+.cal-month{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:400;}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;}
+.cal-dow{text-align:center;font-size:10px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.06em;padding:6px 0;}
+.cal-day{min-height:70px;background:var(--warm);border:1px solid var(--border);border-radius:var(--rsm);padding:5px;cursor:pointer;transition:border-color .15s;}
+.cal-day:hover{border-color:var(--border-mid);}
+.cal-day.other-month{background:transparent;border-color:transparent;pointer-events:none;}
+.cal-day.today{border-color:var(--sage);}
+.cal-day-num{font-size:11px;font-weight:500;color:var(--ink-soft);margin-bottom:3px;}
+
+/* DAY DETAIL MODAL */
+.day-detail{display:none;position:fixed;inset:0;background:rgba(26,23,20,.55);z-index:100;align-items:flex-end;justify-content:center;}
+.day-detail.open{display:flex;}
+.day-sheet{background:var(--warm);border-radius:var(--r) var(--r) 0 0;padding:1.75rem 1.5rem 2.5rem;width:100%;max-width:500px;max-height:85vh;overflow-y:auto;}
+.sheet-handle{width:36px;height:3px;background:var(--border-mid);border-radius:3px;margin:0 auto 1.25rem;}
+.sheet-title{font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:400;margin-bottom:4px;}
+.sheet-weather{font-size:12px;color:var(--ink-faint);margin-bottom:1.25rem;}
+.logged-outfits-row{display:flex;gap:8px;margin-bottom:1rem;}
+.logged-outfit{background:var(--cream);border-radius:var(--rsm);padding:.5rem;flex:1;min-width:0;max-width:140px;}
+.logged-outfit .flatlay-cell{min-height:36px;}
+.logged-outfit-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+.logged-outfit-label{font-size:11px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.06em;}
+.logged-delete-btn{font-size:11px;color:var(--rose);cursor:pointer;border:none;background:none;font-family:'DM Sans',sans-serif;padding:2px 6px;}
+.suggestion-heading{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-faint);margin:1.25rem 0 8px;}
+.sheet-close{width:100%;padding:10px;border-radius:var(--rsm);border:1px solid var(--border);background:none;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif;color:var(--ink-soft);margin-top:1rem;}
+
+/* ITEM MODAL */
+.overlay{position:fixed;inset:0;background:rgba(26,23,20,.55);z-index:100;display:none;align-items:flex-end;justify-content:center;}
+.overlay.open{display:flex;}
+.modal{background:var(--warm);border-radius:var(--r) var(--r) 0 0;padding:1.75rem 1.5rem;width:100%;max-width:460px;max-height:90vh;overflow-y:auto;}
+.modal-handle{width:36px;height:3px;background:var(--border-mid);border-radius:3px;margin:0 auto 1.25rem;}
+.modal h2{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:400;margin-bottom:1.25rem;}
+.fgroup{margin-bottom:14px;}
+.flabel{font-size:11px;color:var(--ink-muted);margin-bottom:5px;display:block;text-transform:uppercase;letter-spacing:.05em;}
+.fhint{font-size:11px;color:var(--ink-faint);margin-top:4px;line-height:1.5;}
+.finput{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:var(--rsm);font-size:14px;font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);outline:none;}
+.fselect{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:var(--rsm);font-size:14px;font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);outline:none;appearance:none;cursor:pointer;}
+.img-preview-row{display:flex;align-items:flex-start;gap:12px;}
+.img-preview-row .finput{flex:1;}
+.img-preview-box{width:72px;height:72px;border-radius:var(--rsm);border:1px solid var(--border);background:var(--cream);overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--ink-faint);flex-shrink:0;}
+.img-preview-box img{width:100%;height:100%;object-fit:contain;}
+.worn-count-badge{display:inline-flex;align-items:center;gap:6px;background:var(--sage-light);color:var(--sage-dark);border-radius:var(--rpill);padding:5px 12px;font-size:12px;font-weight:500;margin-bottom:1rem;}
+.mfooter{display:flex;gap:8px;margin-top:1.25rem;}
+.bcanel{flex:1;padding:10px;border-radius:var(--rsm);border:1px solid var(--border);background:none;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif;color:var(--ink-soft);}
+.bsave{flex:2;padding:10px;border-radius:var(--rsm);border:none;background:var(--ink);color:var(--warm);font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;}
+.bdel{padding:10px 14px;border-radius:var(--rsm);border:1px solid var(--rose-light);background:var(--rose-light);color:var(--rose);font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif;}
+/* PAIRED IN OUTFITS — 4 per row grid */
+.paired-outfits-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:6px;}
+.paired-outfit-card{background:var(--cream);border:1px solid var(--border);border-radius:var(--rsm);overflow:hidden;cursor:pointer;transition:all .15s;position:relative;}
+.paired-outfit-card:hover{border-color:var(--border-mid);}
+.paired-outfit-card.marked-remove{outline:2px solid var(--rose);opacity:.75;}
+.paired-outfit-open-btn{width:100%;padding:4px 6px;font-size:10px;font-weight:500;background:var(--ink);color:var(--warm);border:none;cursor:pointer;font-family:'DM Sans',sans-serif;}
+.paired-remove-badge{position:absolute;top:3px;right:3px;background:var(--rose);color:#fff;font-size:9px;padding:1px 5px;border-radius:var(--rpill);font-weight:500;}
+.paired-pagination{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:12px;color:var(--ink-muted);}
+.page-btn{padding:4px 10px;border-radius:var(--rpill);border:1px solid var(--border);background:var(--warm);font-size:11px;cursor:pointer;font-family:'DM Sans',sans-serif;color:var(--ink-soft);}
+.page-btn:disabled{opacity:.35;cursor:not-allowed;}
+
+/* TOAST / SAVING */
+.toast{position:fixed;bottom:2rem;left:50%;transform:translateX(-50%) translateY(80px);background:var(--ink);color:var(--warm);padding:10px 20px;border-radius:var(--rpill);font-size:13px;z-index:200;transition:transform .3s;pointer-events:none;white-space:nowrap;}
+.toast.show{transform:translateX(-50%) translateY(0);}
+.saving{position:fixed;top:1rem;right:1rem;font-size:11px;color:var(--ink-faint);background:var(--warm);border:1px solid var(--border);border-radius:var(--rpill);padding:4px 10px;z-index:50;opacity:0;transition:opacity .3s;}
+.saving.show{opacity:1;}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <div class="logo">your <em>wardrobe</em></div>
+    <div class="wpill"><span class="wdot"></span><span id="wpill-txt">Loading weather...</span></div>
+  </div>
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('calendar',this)">Calendar</button>
+    <button class="tab" onclick="switchTab('wardrobe',this)">Wardrobe</button>
+    <button class="tab" onclick="switchTab('outfits',this)">Outfits</button>
+    <button class="tab" onclick="switchTab('build',this)">Build</button>
+  </div>
+
+  <!-- CALENDAR -->
+  <div id="view-calendar" class="view active">
+    <div class="cal-nav">
+      <button class="cal-nav-btn" onclick="changeMonth(-1)">&#8592;</button>
+      <div class="cal-month" id="cal-month-label"></div>
+      <button class="cal-nav-btn" onclick="changeMonth(1)">&#8594;</button>
+    </div>
+    <div class="cal-grid" id="cal-grid"></div>
+  </div>
+
+  <!-- WARDROBE -->
+  <div id="view-wardrobe" class="view">
+    <div class="wcontrols">
+      <div class="catfilter" id="cat-filter-btns"></div>
+    </div>
+    <div class="wcontrols" style="margin-top:-0.5rem;">
+      <select class="fselect" id="wardrobe-temp" onchange="renderWardrobe()" style="width:auto;font-size:12px;padding:7px 10px;">
+        <option value="">All temps</option>
+        <option value="freezing">❄️ Freezing</option>
+        <option value="cold">🧥 Cold</option>
+        <option value="mild">🌤️ Mild</option>
+        <option value="warm">☀️ Warm</option>
+      </select>
+      <select class="fselect" id="wardrobe-rain" onchange="renderWardrobe()" style="width:auto;font-size:12px;padding:7px 10px;">
+        <option value="">Any weather</option>
+        <option value="rainy">🌧️ Rainy ok</option>
+      </select>
+      <select class="fselect" id="wardrobe-type" onchange="renderWardrobe()" style="width:auto;font-size:12px;padding:7px 10px;">
+        <option value="">All types</option>
+        <option value="everyday">Everyday</option>
+        <option value="occasion">🎉 Occasion</option>
+        <option value="unavailable">🚫 Unavailable</option>
+      </select>
+      <button class="addbtn" onclick="openAddModal()">+ Add</button>
+    </div>
+    <div id="items-grid"></div>
+  </div>
+
+  <!-- OUTFITS -->
+  <div id="view-outfits" class="view">
+    <div class="outfits-controls">
+      <select class="fselect" id="outfits-sort" onchange="renderOutfits()" style="width:auto;font-size:12px;padding:7px 10px;">
+        <option value="least">Least worn</option>
+        <option value="most">Most worn</option>
+      </select>
+      <select class="fselect" id="outfits-temp" onchange="renderOutfits()" style="width:auto;font-size:12px;padding:7px 10px;">
+        <option value="">All temperatures</option>
+        <option value="freezing">❄️ Freezing</option>
+        <option value="cold">🧥 Cold</option>
+        <option value="mild">🌤️ Mild</option>
+        <option value="warm">☀️ Warm</option>
+        <option value="rainy">🌧️ Rainy ok</option>
+      </select>
+      <select class="fselect" id="outfits-type" onchange="renderOutfits()" style="width:auto;font-size:12px;padding:7px 10px;">
+        <option value="">All types</option>
+        <option value="everyday">Everyday</option>
+        <option value="occasion">🎉 Occasion</option>
+      </select>
+      <div id="outfits-bulk-controls" style="display:none;margin-left:auto;">
+        <button class="btn-danger" style="font-size:12px;padding:7px 12px;" onclick="bulkDeleteOutfits()">Delete selected</button>
+      </div>
+      <button class="catbtn" id="outfits-select-btn" onclick="toggleOutfitSelectMode()" style="margin-left:auto;">Select</button>
+    </div>
+    <div id="outfits-list" class="outfits-grid"></div>
+    <div id="outfits-pagination" style="display:none;justify-content:center;align-items:center;gap:12px;margin-top:1rem;">
+      <button class="page-btn" id="outfits-prev" onclick="outfitsChangePage(-1)">←</button>
+      <span id="outfits-page-label" style="font-size:12px;color:var(--ink-muted);"></span>
+      <button class="page-btn" id="outfits-next" onclick="outfitsChangePage(1)">→</button>
+    </div>
+  </div>
+
+  <!-- BUILD -->
+  <div id="view-build" class="view">
+    <div class="blayout">
+      <div id="builder-left"></div>
+      <div>
+        <div class="preview-panel">
+          <div class="prev-title">Preview</div>
+          <div class="prev-num" id="prev-num">Will save as Outfit 1</div>
+          <div class="prev-pieces" id="prev-pieces"><div class="prev-empty">Select pieces on the left</div></div>
+          <div id="builder-extras" style="display:none;">
+            <div id="acc-link-section" style="display:none;">
+              <hr class="divider">
+              <div class="sec-label">Link accessories</div>
+              <div id="acc-link-content"></div>
+            </div>
+          </div>
+          <button class="save-btn" id="save-btn" onclick="saveOutfit()" disabled>Save outfit</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- WEARING FLOW -->
+<div class="wearing-screen" id="wearing-screen">
+  <button class="wearing-back" onclick="closeWearing()">&#8592; Back</button>
+  <div class="wearing-title">Complete your look</div>
+  <div class="date-pick-section" id="wearing-date-section">
+    <div class="date-pick-label">Which date?</div>
+    <input class="date-input" type="date" id="wearing-date-input">
+  </div>
+  <div style="margin-top:1.25rem;" class="sec-label">Core pieces</div>
+  <div class="wearing-core" id="wearing-core"></div>
+  <div id="wearing-acc-sections"></div>
+  <button class="confirm-btn" onclick="confirmWorn()">Log this outfit</button>
+</div>
+
+<!-- EDIT ACCESSORIES SCREEN -->
+<div class="edit-acc-screen" id="edit-acc-screen">
+  <button class="edit-acc-back" onclick="closeEditAcc()">&#8592; Back</button>
+  <div class="edit-acc-title">Edit accessories</div>
+  <div id="edit-acc-content"></div>
+  <button class="acc-edit-save-btn" onclick="editingLogId?saveEditAccForLog():saveEditAcc()">Save</button>
+</div>
+
+<!-- OUTFIT DETAIL SCREEN -->
+<div class="detail-screen" id="outfit-detail-screen">
+  <button class="detail-back" onclick="closeOutfitDetail()">&#8592; Back</button>
+  <div class="detail-title" id="outfit-detail-title">Outfit</div>
+  <div style="margin-bottom:1.25rem;max-width:220px;max-height:180px;overflow:hidden;" id="outfit-detail-flatlay"></div>
+  <div id="outfit-detail-acc-summary" style="margin-bottom:1rem;"></div>
+  <div class="detail-actions">
+    <button class="btn-danger" onclick="deleteOutfitFromDetail()">Delete</button>
+    <button class="btn-outline" onclick="openEditAccFromDetail()">Edit accessories</button>
+    <button class="btn-dark" onclick="wearOutfitFromDetail()">Wearing this</button>
+  </div>
+</div>
+
+<!-- DATE PICKER SCREEN -->
+<div class="wearing-screen" id="date-pick-screen">
+  <button class="wearing-back" onclick="closeDatePickScreen()">&#8592; Back</button>
+  <div class="wearing-title">When are you wearing this?</div>
+  <div class="date-pick-section">
+    <div class="date-pick-label">Date</div>
+    <input class="date-input" type="date" id="detail-date-input" style="font-size:11px;padding:6px 10px;width:auto;">
+  </div>
+  <button class="btn-outline" style="margin-top:1rem;width:100%;" onclick="openEditAccFromDatePick()">Edit accessories</button>
+  <button class="confirm-btn" onclick="confirmWornFromDetail()">Log this outfit</button>
+</div>
+
+<!-- DAY DETAIL -->
+<div class="day-detail" id="day-detail">
+  <div class="day-sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title" id="sheet-title"></div>
+    <div class="sheet-weather" id="sheet-weather"></div>
+    <div id="sheet-content"></div>
+    <button class="sheet-close" onclick="closeDayDetail()">Close</button>
+  </div>
+</div>
+
+<!-- ADD / EDIT ITEM MODAL -->
+<div class="overlay" id="item-modal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <h2 id="modal-title">Add an item</h2>
+    <div id="worn-count-section" style="display:none;">
+      <div class="worn-count-badge" id="worn-count-badge">👕 Worn 0 times</div>
+    </div>
+    <div class="fgroup" id="occasion-section" style="display:none;">
+      <label class="flabel">Type</label>
+      <div class="tag-row">
+        <button class="wtag" id="occasion-tog" onclick="this.classList.toggle('active')">🎉 Occasion item</button>
+      </div>
+      <div class="fhint">Occasion items won't appear in daily suggestions.</div>
+    </div>
+    <div class="fgroup" id="unavailable-section" style="display:none;">
+      <label class="flabel">Availability</label>
+      <div class="tag-row">
+        <button class="wtag" id="unavailable-tog" onclick="this.classList.toggle('active')">🚫 Mark as unavailable</button>
+      </div>
+      <div class="fhint">Unavailable items and their outfits are hidden from suggestions.</div>
+    </div>
+    <div class="fgroup">
+      <label class="flabel">Google Drive photo link</label>
+      <div class="img-preview-row">
+        <input class="finput" type="url" id="iimg" placeholder="Paste Google Drive share link..." oninput="previewImg(this.value)">
+        <div class="img-preview-box" id="img-preview-box">No photo</div>
+      </div>
+      <div class="fhint">In Google Drive: right-click file → Share → Copy link → paste here.</div>
+      <div class="fhint" style="margin-top:4px;">Tip: remove the background first at <strong>remove.bg</strong> or <strong>PhotoRoom</strong>, and resize to under 200KB at <strong>bulkresizephotos.com</strong> before uploading to Google Drive.</div>
+    </div>
+    <div class="fgroup">
+      <label class="flabel">Category</label>
+      <select class="fselect" id="icat" onchange="onCatChange(this.value)">
+        <option value="tops">Top</option>
+        <option value="bottoms">Bottoms (pants / skirt)</option>
+        <option value="dresses">Dress / jumpsuit</option>
+        <option value="jumpers">Jumper / knitwear</option>
+        <option value="shoes">Shoes</option>
+        <option value="coats">Coat</option>
+        <option value="bags">Bag</option>
+        <option value="scarves">Scarf / Tights</option>
+        <option value="accessories">Accessories</option>
+      </select>
+    </div>
+    <div class="fgroup" id="item-weather-tags">
+      <label class="flabel">When to wear this</label>
+      <div class="tag-group" id="season-tag-group">
+        <div class="tg-name">Season</div>
+        <div class="tag-row">
+          <button class="wtag" data-itag="season:freezing" onclick="toggleItemTag(this)">❄️ Freezing</button>
+          <button class="wtag" data-itag="season:cold" onclick="toggleItemTag(this)">🧥 Cold</button>
+          <button class="wtag" data-itag="season:mild" onclick="toggleItemTag(this)">🌤️ Mild</button>
+          <button class="wtag" data-itag="season:warm" onclick="toggleItemTag(this)">☀️ Warm</button>
+        </div>
+      </div>
+      <div class="tag-group" id="condition-tag-group" style="margin-top:8px;display:none;">
+        <div class="tg-name">Condition</div>
+        <div class="tag-row">
+          <button class="wtag" data-itag="condition:rainy" onclick="toggleItemTag(this)">🌧️ Rainy ok</button>
+        </div>
+      </div>
+    </div>
+    <div id="paired-outfits-section" style="display:none;">
+      <hr class="divider">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+        <div class="sec-label" style="margin-bottom:0;">Paired in outfits</div>
+        <button class="page-btn" id="paired-bulk-btn" onclick="togglePairedBulkMode()" style="font-size:10px;">Select</button>
+      </div>
+      <div class="fhint" style="margin-bottom:10px;">Tap an outfit to unlink this item from it. Changes apply on Save.</div>
+      <div id="paired-bulk-delete-bar" style="display:none;margin-bottom:8px;">
+        <button class="btn-danger" style="font-size:11px;padding:6px 12px;width:100%;" onclick="bulkDeletePairedOutfits()">Unlink selected outfits</button>
+      </div>
+      <div id="paired-outfits-list"></div>
+      <div class="paired-pagination" id="paired-pagination" style="display:none;">
+        <button class="page-btn" id="paired-prev" onclick="pairedPage(-1)">&#8592;</button>
+        <span id="paired-page-label"></span>
+        <button class="page-btn" id="paired-next" onclick="pairedPage(1)">&#8594;</button>
+      </div>
+    </div>
+    <div class="mfooter">
+      <button class="bcanel" onclick="closeItemModal()">Cancel</button>
+      <button class="bdel" id="modal-del-btn" style="display:none;" onclick="deleteCurrentItem()">Remove</button>
+      <button class="bsave" onclick="saveItemModal()">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<div class="saving" id="saving">Saving...</div>
+
+<script>
+const API='https://script.google.com/macros/s/AKfycbx07IkbG4IsgQtQPvNo1mCyWfm7cIgM9GBq5zSvrWzBQx3_RXHT2RlqcRBfvvPwpCTk/exec';
+const LAT=47.6062,LON=-122.3321;
+
+// ===== CATEGORY ORDER (item 8) =====
+// Order: Top, Bottom, Dress, Jumper, Shoes, Coat, Bag, Scarf/Tights, Accessories
+const CATS={
+  tops:       {label:'Top',          emoji:'👕'},
+  bottoms:    {label:'Bottoms',      emoji:'👖'},
+  dresses:    {label:'Dress',        emoji:'👗'},
+  jumpers:    {label:'Jumper',       emoji:'🧶'},
+  shoes:      {label:'Shoes',        emoji:'👟'},
+  coats:      {label:'Coat',         emoji:'🧥'},
+  bags:       {label:'Bag',          emoji:'👜'},
+  scarves:    {label:'Scarf/Tights', emoji:'🧣'},
+  accessories:{label:'Accessories',  emoji:'💍'},
+};
+const CORE_CATS=['tops','bottoms','dresses','jumpers'];
+const ACC_CATS=['shoes','coats','bags','scarves','accessories'];
+const SEASON_TAG_CATS=['shoes','bags','coats','scarves','accessories'];
+const RAINY_TAG_CATS=['bottoms','dresses','shoes','bags','coats','scarves'];
+const OCCASION_CATS=['tops','jumpers','bottoms','dresses','shoes','bags'];
+
+const SEASON_RANGES={
+  freezing:{min:-99,max:5},
+  cold:{min:5,max:13},
+  mild:{min:13,max:23},
+  warm:{min:23,max:99}
+};
+
+let items=[],outfits=[],wornLogs=[];
+let weather={tempC:null,condition:'',label:'',icon:'☁️'};
+let forecast=[];
+let currentCat='all',calYear,calMonth;
+let builderSel={};
+let editingItemId=null,wearingOutfitId=null,pendingWearDateStr=null;
+let currentOutfitDetailId=null,outfitDetailReturnTo=null;
+let pairedPage_current=0,pairedMarkedForRemoval=new Set();
+let savingTimer=null;
+let editAccOutfitId=null,editAccState={};
+
+// ===== API =====
+async function apiCall(params){
+  const url=new URL(API);
+  Object.entries(params).forEach(([k,v])=>url.searchParams.set(k,typeof v==='object'?JSON.stringify(v):v));
+  try{const r=await fetch(url);return r.json();}catch(e){return{error:e.toString()};}
+}
+function showSaving(){
+  const el=document.getElementById('saving');
+  el.classList.add('show');
+  clearTimeout(savingTimer);
+  savingTimer=setTimeout(()=>el.classList.remove('show'),1800);
+}
+
+// ===== WEATHER =====
+async function loadWeather(){
+  try{
+    const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&current=temperature_2m,weathercode&daily=temperature_2m_max,weathercode&timezone=America%2FLos_Angeles&forecast_days=10`);
+    const d=await r.json();
+    const tempC=Math.round(d.current.temperature_2m);
+    const code=d.current.weathercode;
+    weather={tempC,condition:wmoToCondition(code),label:wmoToLabel(code),icon:wmoToIcon(code)};
+    forecast=d.daily.time.map((date,i)=>({
+      date,tempC:Math.round(d.daily.temperature_2m_max[i]),
+      condition:wmoToCondition(d.daily.weathercode[i]),
+      icon:wmoToIcon(d.daily.weathercode[i]),
+      label:wmoToLabel(d.daily.weathercode[i])
+    }));
+    document.getElementById('wpill-txt').textContent=`Seattle · ${tempC}°C · ${weather.label}`;
+  }catch(e){
+    document.getElementById('wpill-txt').textContent='Seattle · weather unavailable';
+  }
+}
+function wmoToCondition(c){if(c>=51)return'rainy';return'';}
+function wmoToIcon(c){if(c<=1)return'☀️';if(c<=3)return'☁️';if(c>=51)return'🌧️';return'☁️';}
+function wmoToLabel(c){
+  if(c===0)return'Clear sky';if(c<=2)return'Partly cloudy';if(c<=3)return'Overcast';
+  if(c<=48)return'Foggy';if(c<=67)return'Rainy';if(c<=77)return'Snowy';
+  if(c<=82)return'Showers';return'Stormy';
+}
+
+// ===== GOOGLE DRIVE URL =====
+function toDirectUrl(url){
+  if(!url||!url.trim())return null;
+  url=url.trim();
+  if(url.includes('drive.google.com')){
+    const m=url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    if(m)return`https://lh3.googleusercontent.com/d/${m[1]}`;
+    return null;
+  }
+  if(url.includes('dropbox.com')||url.includes('dropboxusercontent.com')){
+    url=url.replace('www.dropbox.com','dl.dropboxusercontent.com');
+    url=url.replace(/[?&]st=[^&]*/g,'').replace(/[?&]dl=\d/g,'');
+    url=url.replace(/\?&/,'?').replace(/[?&]$/,'');
+    return url;
+  }
+  return url;
+}
+function previewImg(val){
+  const direct=toDirectUrl(val);
+  const box=document.getElementById('img-preview-box');
+  if(direct)box.innerHTML=`<img src="${direct}" loading="lazy" onerror="this.parentElement.innerHTML='Bad link'">`;
+  else box.innerHTML='No photo';
+}
+
+// ===== INIT =====
+async function init(){
+  const today=new Date();
+  calYear=today.getFullYear();calMonth=today.getMonth();
+  buildCatFilterBtns();
+  await loadWeather();
+  // Priority: load items + logs first so calendar renders immediately
+  const [ir,lr]=await Promise.all([
+    apiCall({action:'getItems'}),
+    apiCall({action:'getLogs'})
+  ]);
+  items=Array.isArray(ir)?ir.map(normalizeItem):[];
+  wornLogs=Array.isArray(lr)?lr:[];
+  renderCalendar();
+  // Then load outfits in background
+  const or=await apiCall({action:'getOutfits'});
+  outfits=Array.isArray(or)?or.map(normalizeOutfit):[];
+  renderCalendar(); // re-render with outfit thumbnails
+  renderWardrobe();
+}
+
+function normalizeItem(i){
+  let img=i.img||'';
+  if(img.includes('&st='))img=img.replace(/&st=[^&]*/,'');
+  else if(img.includes('?st='))img=img.replace(/\?st=[^&]*/,'');
+  return{...i,img,
+    seasons:parseArr(i.seasons),
+    conditions:parseArr(i.conditions),
+    wornCount:Number(i.wornCount)||0,
+    occasion:i.occasion==='true'||i.occasion===true,
+    unavailable:i.unavailable==='true'||i.unavailable===true
+  };
+}
+function normalizeOutfit(o){
+  let accByCat={};
+  try{
+    if(!o.accByCat||o.accByCat===''||o.accByCat==='{}')accByCat={};
+    else if(typeof o.accByCat==='object')accByCat=o.accByCat;
+    else accByCat=JSON.parse(o.accByCat);
+  }catch(e){accByCat={};}
+  return{...o,
+    num:Number(o.num),
+    pieces:parseArr(o.pieces),
+    accessories:parseArr(o.accessories),
+    seasons:parseArr(o.seasons),
+    conditions:parseArr(o.conditions),
+    accByCat
+  };
+}
+function parseArr(v){
+  if(Array.isArray(v))return v;
+  try{return JSON.parse(v||'[]');}catch{return[];}
+}
+
+function normaliseDate(d){
+  if(!d)return'';
+  const s=String(d).trim();
+  if(/^\d{4}-\d{2}-\d{2}$/.test(s))return s;
+  if(s.includes('T'))return s.split('T')[0];
+  const dt=new Date(s);
+  if(!isNaN(dt))return dt.toLocaleDateString('en-CA');
+  return s;
+}
+
+function buildCatFilterBtns(){
+  const div=document.getElementById('cat-filter-btns');
+  div.innerHTML=`<button class="catbtn active" onclick="filterCat(this,'all')">All</button>`+
+    Object.entries(CATS).map(([k,v])=>`<button class="catbtn" onclick="filterCat(this,'${k}')">${v.label}</button>`).join('');
+}
+
+// ===== TABS =====
+function switchTab(name,btn){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('view-'+name).classList.add('active');
+  btn.classList.add('active');
+  if(name==='build')renderBuilder();
+  if(name==='calendar')renderCalendar();
+  if(name==='outfits')renderOutfits();
+}
+
+// ===== HELPERS =====
+function getItem(id){return items.find(i=>i.id===id);}
+function daysAgo(n){const d=new Date();d.setDate(d.getDate()-n);return d.toISOString();}
+function daysSince(iso){if(!iso)return 999;return Math.round((Date.now()-new Date(iso))/86400000);}
+function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500);}
+function todayStr(){return new Date().toLocaleDateString('en-CA');}
+
+function isOccasionOutfit(o){
+  return(o.pieces||[]).some(pid=>{const it=getItem(pid);return it&&it.occasion;});
+}
+function score(o){
+  const ps=(o.pieces||[]).map(getItem).filter(Boolean);
+  const avg=ps.length?ps.reduce((s,p)=>s+daysSince(p.lastWorn),0)/ps.length:0;
+  return daysSince(o.lastWorn)+avg*2;
+}
+function weatherOk(o,tempC,condition){
+  const corePieces=(o.pieces||[]).map(getItem).filter(Boolean);
+  const tOk=corePieces.every(it=>{
+    const s=it.seasons||[];
+    if(!s.length)return true;
+    return s.some(season=>{const r=SEASON_RANGES[season];return r&&tempC>=r.min&&tempC<r.max;});
+  });
+  const cOk=condition!=='rainy'||corePieces.every(it=>{
+    if(!RAINY_TAG_CATS.includes(it.cat))return true;
+    return(it.conditions||[]).includes('rainy');
+  });
+  return tOk&&cOk;
+}
+function accWeatherOk(a,tempC,condition){
+  if(a.occasion)return false;
+  if(a.unavailable)return false;
+  if(tempC===null||tempC===undefined)return true;
+  const s=SEASON_TAG_CATS.includes(a.cat)?(a.seasons||[]):[];
+  const c=RAINY_TAG_CATS.includes(a.cat)?(a.conditions||[]):[];
+  if(!s.length&&!c.length)return true;
+  const tOk=!s.length||s.some(season=>{const r=SEASON_RANGES[season];return r&&tempC>=r.min&&tempC<r.max;});
+  const cOk=condition!=='rainy'||!c.length||c.includes('rainy');
+  return tOk&&cOk;
+}
+function outfitMatchesTempFilter(o,band){
+  if(!band)return true;
+  if(band==='rainy'){
+    const corePieces=(o.pieces||[]).map(getItem).filter(Boolean);
+    return corePieces.every(it=>{
+      if(!RAINY_TAG_CATS.includes(it.cat))return true;
+      return(it.conditions||[]).includes('rainy');
+    });
+  }
+  return(o.pieces||[]).some(pid=>{const it=getItem(pid);return it&&(it.seasons||[]).includes(band);});
+}
+
+// ===== ITEM 4: Infer outfit's effective season from selected core pieces (intersection) =====
+function inferOutfitSeasons(pieceIds){
+  const pieces=pieceIds.map(id=>getItem(id)).filter(Boolean);
+  if(!pieces.length)return null; // null = no info, show everything
+  // Only consider pieces that actually have season tags
+  const taggedPieces=pieces.filter(p=>(p.seasons||[]).length>0);
+  if(!taggedPieces.length)return null; // no tags = no restriction
+  // Intersection of all tagged pieces' seasons
+  let intersection=new Set(taggedPieces[0].seasons);
+  for(let i=1;i<taggedPieces.length;i++){
+    const s=new Set(taggedPieces[i].seasons);
+    intersection=new Set([...intersection].filter(x=>s.has(x)));
+  }
+  return intersection.size>0?intersection:null; // null if empty intersection = show everything
+}
+
+// Check if an accessory is compatible with a given outfit's inferred seasons
+function accCompatibleWithOutfit(acc,outfitSeasons){
+  if(!outfitSeasons)return true; // no season info = show all
+  if(!SEASON_TAG_CATS.includes(acc.cat))return true; // cat doesn't use season tags
+  const accSeasons=acc.seasons||[];
+  if(!accSeasons.length)return true; // acc has no tags = always ok
+  // Compatible if any outfit season overlaps with any acc season
+  return accSeasons.some(s=>outfitSeasons.has(s));
+}
+
+// ===== FLAT-LAY GRID =====
+// ITEM 1: support multiple dresses / dress+top / dress+bottom combos
+function buildFlatlay(outfitId,sm=false){
+  const o=outfits.find(x=>x.id===outfitId);
+  if(!o)return'';
+  const pieces=(o.pieces||[]).map(getItem).filter(Boolean);
+
+  const coat=pieces.find(p=>p.cat==='coats')
+    ||(o.accByCat?.coats||[]).map(id=>getItem(id)).filter(Boolean)[0]||null;
+  const jumper=pieces.find(p=>p.cat==='jumpers')||null;
+  const tops=pieces.filter(p=>p.cat==='tops');
+  const bottoms=pieces.filter(p=>p.cat==='bottoms');
+  const dresses=pieces.filter(p=>p.cat==='dresses');
+  const shoes=(o.accByCat?.shoes||[]).map(id=>getItem(id)).filter(Boolean)[0]||null;
+
+  const accItems=[];
+  ['bags','scarves','accessories'].forEach(cat=>{
+    (o.accByCat?.[cat]||[]).forEach(id=>{const it=getItem(id);if(it)accItems.push(it);});
+  });
+  const accSlots=accItems.slice(0,4);
+  const accOverflow=accItems.length>4?accItems.length-4:0;
+
+  const cols=[];
+
+  // Coat column (spans both rows)
+  if(coat)cols.push({span:true,items:[coat]});
+
+  // Jumper + shoes column
+  if(jumper||shoes)cols.push({span:false,items:[jumper,shoes]});
+
+  // Build body columns dynamically from whatever tops/bottoms/dresses exist
+  // Each dress gets its own spanning column
+  // Tops pair with bottoms — first top pairs with first bottom, extras get their own half-column
+  const usedBottoms=new Set();
+  tops.forEach((top,i)=>{
+    const bot=bottoms[i]||null;
+    if(bot)usedBottoms.add(bot.id);
+    cols.push({span:false,items:[top,bot]});
+  });
+  // Remaining bottoms without a top partner
+  bottoms.filter(b=>!usedBottoms.has(b.id)).forEach(bot=>{
+    cols.push({span:false,items:[null,bot]});
+  });
+  // Dresses — each spans both rows
+  dresses.forEach(dress=>{
+    cols.push({span:true,items:[dress]});
+  });
+
+  // Accessory columns (2 per col)
+  if(accSlots.length>0)cols.push({span:false,items:[accSlots[0]||null,accSlots[1]||null],accOverflow:accSlots.length<=2?accOverflow:0});
+  if(accSlots.length>2)cols.push({span:false,items:[accSlots[2]||null,accSlots[3]||null],accOverflow});
+
+  if(!cols.length)return'';
+
+  const numCols=cols.length;
+  let cellsHtml='';
+  cols.forEach((col,ci)=>{
+    const colNum=ci+1;
+    if(col.span){
+      cellsHtml+=`<div class="flatlay-cell" style="grid-column:${colNum};grid-row:1/3;">${renderCellInner(col.items[0],false)}</div>`;
+    } else {
+      const showMore=col.accOverflow>0;
+      cellsHtml+=`<div class="flatlay-cell" style="grid-column:${colNum};grid-row:1;">${renderCellInner(col.items[0],false)}</div>`;
+      cellsHtml+=`<div class="flatlay-cell" style="grid-column:${colNum};grid-row:2;">${renderCellInner(col.items[1],showMore,col.accOverflow)}</div>`;
+    }
+  });
+
+  return`<div class="${sm?'flatlay flatlay-sm':'flatlay'}" style="grid-template-columns:repeat(${numCols},1fr);">${cellsHtml}</div>`;
+}
+
+// Core-only flatlay for outfit grid cards (item 1: same dynamic column logic, no accs)
+function buildFlatlayCore(outfitId){
+  const o=outfits.find(x=>x.id===outfitId);
+  if(!o)return'';
+  const pieces=(o.pieces||[]).map(getItem).filter(Boolean);
+
+  const jumper=pieces.find(p=>p.cat==='jumpers')||null;
+  const tops=pieces.filter(p=>p.cat==='tops');
+  const bottoms=pieces.filter(p=>p.cat==='bottoms');
+  const dresses=pieces.filter(p=>p.cat==='dresses');
+
+  const cols=[];
+  if(jumper)cols.push({span:false,items:[jumper,null]});
+
+  const usedBottoms=new Set();
+  tops.forEach((top,i)=>{
+    const bot=bottoms[i]||null;
+    if(bot)usedBottoms.add(bot.id);
+    cols.push({span:false,items:[top,bot]});
+  });
+  bottoms.filter(b=>!usedBottoms.has(b.id)).forEach(bot=>{
+    cols.push({span:false,items:[null,bot]});
+  });
+  dresses.forEach(dress=>{
+    cols.push({span:true,items:[dress]});
+  });
+
+  if(!cols.length)return'';
+  const numCols=cols.length;
+  let cellsHtml='';
+  cols.forEach((col,ci)=>{
+    const colNum=ci+1;
+    if(col.span){
+      cellsHtml+=`<div class="flatlay-cell" style="grid-column:${colNum};grid-row:1/3;">${renderCellInner(col.items[0],false)}</div>`;
+    } else {
+      cellsHtml+=`<div class="flatlay-cell" style="grid-column:${colNum};grid-row:1;">${renderCellInner(col.items[0],false)}</div>`;
+      cellsHtml+=`<div class="flatlay-cell" style="grid-column:${colNum};grid-row:2;">${renderCellInner(col.items[1],false)}</div>`;
+    }
+  });
+  return`<div class="flatlay" style="grid-template-columns:repeat(${numCols},1fr);">${cellsHtml}</div>`;
+}
+
+function renderCellInner(item,showMore,overflow){
+  if(!item)return'';
+  const img=item.img?`<img src="${item.img}" loading="lazy">`:`<span>${item.emoji||'👕'}</span>`;
+  const more=(showMore&&overflow)?`<div class="flatlay-more">+${overflow} more</div>`:'';
+  return img+more;
+}
+
+const OUTFITS_PER_PAGE=24;
+let outfitsPage=0;
+let outfitsFiltered=[];
+let outfitSelectMode=false;
+let outfitSelected=new Set();
+
+function toggleOutfitSelectMode(){
+  outfitSelectMode=!outfitSelectMode;
+  outfitSelected=new Set();
+  document.getElementById('outfits-select-btn').textContent=outfitSelectMode?'Cancel':'Select';
+  document.getElementById('outfits-select-btn').classList.toggle('active',outfitSelectMode);
+  document.getElementById('outfits-bulk-controls').style.display=outfitSelectMode?'block':'none';
+  renderOutfits();
+}
+
+async function bulkDeleteOutfits(){
+  if(!outfitSelected.size)return;
+  if(!confirm(`Delete ${outfitSelected.size} outfit${outfitSelected.size>1?'s':''}?`))return;
+  const ids=[...outfitSelected];
+  outfits=outfits.filter(o=>!ids.includes(o.id));
+  outfitSelected=new Set();
+  outfitSelectMode=false;
+  document.getElementById('outfits-select-btn').textContent='Select';
+  document.getElementById('outfits-select-btn').classList.remove('active');
+  document.getElementById('outfits-bulk-controls').style.display='none';
+  renderOutfits();
+  showSaving();
+  await Promise.all(ids.map(id=>apiCall({action:'deleteOutfit',id})));
+  showToast(`${ids.length} outfit${ids.length>1?'s':''} deleted`);
+}
+
+function outfitsChangePage(dir){
+  outfitsPage+=dir;
+  renderOutfitsPage();
+  window.scrollTo(0,0);
+}
+
+// ===== OUTFITS TAB =====
+function renderOutfits(){
+  const sort=document.getElementById('outfits-sort')?.value||'least';
+  const tempFilter=document.getElementById('outfits-temp')?.value||'';
+  const typeFilter=document.getElementById('outfits-type')?.value||'';
+  outfitsPage=0;
+  outfitsFiltered=outfits.filter(o=>o.id!=='__preview__');
+  if(tempFilter)outfitsFiltered=outfitsFiltered.filter(o=>outfitMatchesTempFilter(o,tempFilter));
+  if(typeFilter==='occasion')outfitsFiltered=outfitsFiltered.filter(o=>isOccasionOutfit(o));
+  if(typeFilter==='everyday')outfitsFiltered=outfitsFiltered.filter(o=>!isOccasionOutfit(o));
+  outfitsFiltered.sort((a,b)=>sort==='most'?score(a)-score(b):score(b)-score(a));
+  renderOutfitsPage();
+}
+
+function renderOutfitsPage(){
+  const list=document.getElementById('outfits-list');
+  const pag=document.getElementById('outfits-pagination');
+  if(!outfitsFiltered.length){
+    list.innerHTML='<div class="empty-state">No outfits yet.<br>Go to Build to create one.</div>';
+    pag.style.display='none';return;
+  }
+  const totalPages=Math.ceil(outfitsFiltered.length/OUTFITS_PER_PAGE);
+  outfitsPage=Math.max(0,Math.min(outfitsPage,totalPages-1));
+  const page=outfitsFiltered.slice(outfitsPage*OUTFITS_PER_PAGE,(outfitsPage+1)*OUTFITS_PER_PAGE);
+
+  list.innerHTML=page.map(o=>{
+    const isOcc=isOccasionOutfit(o);
+    const dUnworn=daysSince(o.lastWorn);
+    const isSelected=outfitSelected.has(o.id);
+    return`<div class="outfit-card${isSelected?' outfit-card-selected':''}" onclick="${outfitSelectMode?`toggleOutfitSelect('${o.id}')`:`openOutfitDetail('${o.id}','outfits')`}">
+      ${outfitSelectMode?`<div style="position:absolute;top:5px;left:5px;width:18px;height:18px;border-radius:50%;background:${isSelected?'var(--sage)':'var(--warm)'};border:2px solid ${isSelected?'var(--sage)':'var(--border-mid)'};z-index:2;"></div>`:''}
+      ${buildFlatlayCore(o.id)}
+      <div class="outfit-card-foot">
+        <div class="outfit-card-badges">
+          ${isOcc?'<span class="sbadge badge-old">🎉 Occasion</span>':''}
+          <span class="sbadge ${dUnworn>=14?'badge-old':'badge-ok'}">${dUnworn>=14?`⏳ ${dUnworn}d unworn`:'✓ Good rotation'}</span>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  if(totalPages>1){
+    pag.style.display='flex';
+    document.getElementById('outfits-page-label').textContent=`${outfitsPage+1} / ${totalPages}`;
+    document.getElementById('outfits-prev').disabled=outfitsPage===0;
+    document.getElementById('outfits-next').disabled=outfitsPage>=totalPages-1;
+  } else {
+    pag.style.display='none';
+  }
+}
+
+function toggleOutfitSelect(id){
+  if(outfitSelected.has(id))outfitSelected.delete(id);
+  else outfitSelected.add(id);
+  renderOutfitsPage();
+}
+
+// ===== OUTFIT DETAIL =====
+function openOutfitDetail(outfitId,returnTo){
+  currentOutfitDetailId=outfitId;
+  outfitDetailReturnTo=returnTo||'outfits';
+  const o=outfits.find(x=>x.id===outfitId);
+  if(!o)return;
+  const isOcc=isOccasionOutfit(o);
+  document.getElementById('outfit-detail-title').textContent=isOcc?'🎉 Occasion outfit':'Outfit';
+  document.getElementById('outfit-detail-flatlay').innerHTML=buildFlatlayCore(outfitId);
+
+  const accSummary=document.getElementById('outfit-detail-acc-summary');
+  accSummary.innerHTML='';
+  let hasAnyAcc=false;
+  ACC_CATS.forEach(cat=>{
+    const linked=(o.accByCat[cat]||[]).map(id=>getItem(id)).filter(Boolean);
+    if(!linked.length)return;
+    hasAnyAcc=true;
+    const div=document.createElement('div');
+    div.style.marginBottom='14px';
+    // ITEM 2: no label text under each accessory thumb (category header already shown)
+    div.innerHTML=`<div class="sec-label" style="margin-bottom:8px;">${CATS[cat].label}</div>
+      <div class="acc-options">
+        ${linked.map(a=>`
+          <div class="acc-option" id="dopt-${a.id}" onclick="toggleDetailAcc('${a.id}')">
+            <div class="acc-option-thumb">${a.img?`<img src="${a.img}" loading="lazy">`:`<span>${a.emoji||'💍'}</span>`}</div>
+          </div>`).join('')}
+      </div>`;
+    accSummary.appendChild(div);
+  });
+  if(hasAnyAcc){
+    const hint=document.createElement('div');
+    hint.style.cssText='font-size:11px;color:var(--ink-faint);margin-bottom:1rem;';
+    hint.textContent='Tap accessories to select what you\'re wearing today.';
+    accSummary.insertBefore(hint,accSummary.firstChild);
+  }
+
+  document.getElementById('item-modal').classList.remove('open');
+  document.getElementById('outfit-detail-screen').classList.add('open');
+}
+
+function toggleDetailAcc(itemId){
+  const el=document.getElementById(`dopt-${itemId}`);
+  if(el)el.classList.toggle('selected');
+}
+
+function closeOutfitDetail(){
+  document.getElementById('outfit-detail-screen').classList.remove('open');
+  currentOutfitDetailId=null;
+}
+
+function wearOutfitFromDetail(){
+  if(!currentOutfitDetailId)return;
+  document.getElementById('date-pick-screen').dataset.outfitId=currentOutfitDetailId;
+  const dateInput=document.getElementById('detail-date-input');
+  dateInput.value=todayStr();
+  dateInput.max=todayStr();
+  document.getElementById('date-pick-screen').classList.add('open');
+}
+
+function openEditAccFromDatePick(){
+  const oid=document.getElementById('date-pick-screen').dataset.outfitId||currentOutfitDetailId;
+  if(!oid)return;
+  // Temporarily set currentOutfitDetailId so openEditAccFromDetail works
+  const prev=currentOutfitDetailId;
+  currentOutfitDetailId=oid;
+  openEditAccFromDetail();
+  currentOutfitDetailId=prev;
+}
+
+function closeDatePickScreen(){
+  document.getElementById('date-pick-screen').classList.remove('open');
+  const oid=document.getElementById('date-pick-screen').dataset.outfitId;
+  if(oid&&!currentOutfitDetailId)currentOutfitDetailId=oid;
+}
+
+async function confirmWornFromDetail(){
+  const oid=document.getElementById('date-pick-screen').dataset.outfitId||currentOutfitDetailId;
+  const o=outfits.find(x=>x.id===oid);
+  if(!o)return;
+  const chosenAccs=[...document.querySelectorAll('#outfit-detail-acc-summary .acc-option.selected')]
+    .map(el=>el.id.replace('dopt-',''));
+  const logDate=document.getElementById('detail-date-input').value||todayStr();
+  const log={
+    id:'l'+Date.now(),date:logDate,
+    outfitId:o.id,outfitNum:o.num,
+    pieces:o.pieces,accessories:chosenAccs,
+    tempC:weather.tempC,condition:weather.condition,weatherLabel:weather.label
+  };
+  o.lastWorn=new Date().toISOString();
+  const allWorn=[...o.pieces,...chosenAccs];
+  allWorn.forEach(pid=>{const it=getItem(pid);if(it){it.lastWorn=new Date().toISOString();it.wornCount=(it.wornCount||0)+1;}});
+  wornLogs.push(log);
+  closeDatePickScreen();
+  closeOutfitDetail();
+  renderCalendar();
+  showSaving();
+  await Promise.all([
+    apiCall({action:'updateOutfit',data:{...o,accByCat:JSON.stringify(o.accByCat)}}),
+    apiCall({action:'saveLog',data:log}),
+    ...allWorn.map(pid=>{const it=getItem(pid);return it?apiCall({action:'updateItem',data:it}):Promise.resolve();})
+  ]);
+  showToast('Outfit logged!');
+}
+
+// ===== ITEM 5: Edit Accessories — accordion per category + item 4 season greying =====
+function openEditAccFromDetail(){
+  if(!currentOutfitDetailId)return;
+  const o=outfits.find(x=>x.id===currentOutfitDetailId);
+  if(!o)return;
+  editAccOutfitId=currentOutfitDetailId;
+  editAccState={};
+  ACC_CATS.forEach(cat=>{editAccState[cat]=[...(o.accByCat[cat]||[])];});
+
+  // Infer outfit seasons from core pieces for greying
+  const outfitSeasons=inferOutfitSeasons(o.pieces||[]);
+
+  const content=document.getElementById('edit-acc-content');
+  content.innerHTML='';
+  const previewDiv=document.createElement('div');
+  previewDiv.style.cssText='margin-bottom:1.25rem;max-width:200px;';
+  previewDiv.innerHTML=buildFlatlayCore(editAccOutfitId);
+  content.appendChild(previewDiv);
+
+  ACC_CATS.forEach(cat=>{
+    const allCatItems=items.filter(i=>i.cat===cat);
+    if(!allCatItems.length)return;
+    const div=document.createElement('div');
+    div.className='acc-edit-cat';
+    const linkedCount=(editAccState[cat]||[]).length;
+    div.innerHTML=`<div class="acc-edit-cat-header" onclick="toggleEditAccSection('eacc-cat-${cat}',this)">
+        ${CATS[cat].label}
+        <span class="acc-count-pill">${linkedCount} linked · ${allCatItems.length} total</span>
+        <span class="acc-arrow">▸</span>
+      </div>
+      <div class="acc-edit-options" id="eacc-cat-${cat}">
+        ${allCatItems.map(a=>{
+          const isLinked=(editAccState[cat]||[]).includes(a.id);
+          const isGreyed=!accCompatibleWithOutfit(a,outfitSeasons)||!!a.unavailable;
+          return`<div class="acc-edit-item${isLinked?' linked':''}${isGreyed?' greyed':''}" id="eacc-${cat}-${a.id}" onclick="toggleEditAcc('${cat}','${a.id}')">
+            <div class="acc-edit-thumb">${a.img?`<img src="${a.img}" loading="lazy">`:`<span>${a.emoji||'💍'}</span>`}</div>
+          </div>`;
+        }).join('')}
+      </div>`;
+    content.appendChild(div);
+  });
+
+  document.getElementById('edit-acc-screen').classList.add('open');
+}
+
+function toggleEditAccSection(id,titleEl){
+  const body=document.getElementById(id);
+  const arrow=titleEl.querySelector('.acc-arrow');
+  const isOpen=body.classList.contains('open');
+  // Close all
+  document.querySelectorAll('.acc-edit-options').forEach(b=>b.classList.remove('open'));
+  document.querySelectorAll('.acc-edit-cat-header .acc-arrow').forEach(a=>a.textContent='▸');
+  if(!isOpen){body.classList.add('open');arrow.textContent='▾';}
+}
+
+function toggleEditAcc(cat,itemId){
+  const idx=(editAccState[cat]||[]).indexOf(itemId);
+  if(idx>-1)editAccState[cat].splice(idx,1);
+  else{if(!editAccState[cat])editAccState[cat]=[];editAccState[cat].push(itemId);}
+  const el=document.getElementById(`eacc-${cat}-${itemId}`);
+  if(el)el.classList.toggle('linked',(editAccState[cat]||[]).includes(itemId));
+}
+
+async function saveEditAcc(){
+  const o=outfits.find(x=>x.id===editAccOutfitId);
+  if(!o)return;
+  ACC_CATS.forEach(cat=>{o.accByCat[cat]=editAccState[cat]||[];});
+  o.accessories=Object.values(o.accByCat).flat();
+  document.getElementById('outfit-detail-flatlay').innerHTML=buildFlatlayCore(editAccOutfitId);
+  // Re-render acc summary in detail
+  const accSummary=document.getElementById('outfit-detail-acc-summary');
+  accSummary.innerHTML='';
+  let hasAnyAcc=false;
+  ACC_CATS.forEach(cat=>{
+    const linked=(o.accByCat[cat]||[]).map(id=>getItem(id)).filter(Boolean);
+    if(!linked.length)return;
+    hasAnyAcc=true;
+    const div=document.createElement('div');
+    div.style.marginBottom='14px';
+    div.innerHTML=`<div class="sec-label" style="margin-bottom:8px;">${CATS[cat].label}</div>
+      <div class="acc-options">
+        ${linked.map(a=>`
+          <div class="acc-option" id="dopt-${a.id}" onclick="toggleDetailAcc('${a.id}')">
+            <div class="acc-option-thumb">${a.img?`<img src="${a.img}" loading="lazy">`:`<span>${a.emoji||'💍'}</span>`}</div>
+          </div>`).join('')}
+      </div>`;
+    accSummary.appendChild(div);
+  });
+  if(hasAnyAcc){
+    const hint=document.createElement('div');
+    hint.style.cssText='font-size:11px;color:var(--ink-faint);margin-bottom:1rem;';
+    hint.textContent='Tap accessories to select what you\'re wearing today.';
+    accSummary.insertBefore(hint,accSummary.firstChild);
+  }
+  closeEditAcc();
+  showSaving();
+  await apiCall({action:'updateOutfit',data:{...o,accByCat:JSON.stringify(o.accByCat)}});
+  showToast('Accessories saved');
+}
+
+let editingLogId=null;
+
+function editLogAccFromSheet(logId,outfitId){
+  editingLogId=logId;
+  closeDayDetail();
+  currentOutfitDetailId=outfitId;
+  openEditAccFromDetail();
+}
+
+async function saveEditAccForLog(){
+  const o=outfits.find(x=>x.id===editAccOutfitId);
+  if(!o)return;
+  ACC_CATS.forEach(cat=>{o.accByCat[cat]=editAccState[cat]||[];});
+  o.accessories=Object.values(o.accByCat).flat();
+  // Update the log's accessories
+  const log=wornLogs.find(l=>l.id===editingLogId);
+  if(log){
+    const newAccs=Object.values(editAccState).flat();
+    log.accessories=newAccs;
+    closeEditAcc();
+    editingLogId=null;
+    renderCalendar();
+    showSaving();
+    await Promise.all([
+      apiCall({action:'updateOutfit',data:{...o,accByCat:JSON.stringify(o.accByCat)}}),
+      apiCall({action:'updateLog',data:log})
+    ]);
+    showToast('Accessories updated');
+  } else {
+    closeEditAcc();
+    editingLogId=null;
+  }
+}
+
+async function deleteOutfitFromDetail(){
+  if(!currentOutfitDetailId)return;
+  if(!confirm('Delete this outfit?'))return;
+  const id=currentOutfitDetailId;
+  outfits=outfits.filter(o=>o.id!==id);
+  closeOutfitDetail();
+  renderOutfits();
+  showSaving();
+  await apiCall({action:'deleteOutfit',id});
+  showToast('Outfit deleted');
+}
+
+// ===== WEARING FLOW =====
+function openWearing(outfitId,dateOverride){
+  pendingWearDateStr=dateOverride||null;
+  wearingOutfitId=outfitId;
+  const o=outfits.find(x=>x.id===outfitId);
+  if(!o)return;
+
+  const dateInput=document.getElementById('wearing-date-input');
+  dateInput.value=dateOverride||todayStr();
+  dateInput.max=todayStr();
+  const dateSec=document.getElementById('wearing-date-section');
+  if(dateSec)dateSec.style.display=dateOverride?'none':'block';
+
+  const pieces=o.pieces.map(getItem).filter(Boolean);
+  document.getElementById('wearing-core').innerHTML=pieces.map(p=>`
+    <div class="wearing-piece-thumb">${p.img?`<img src="${p.img}" loading="lazy">`:`<span>${p.emoji||'👕'}</span>`}</div>`).join('');
+
+  const accByCat=o.accByCat||{};
+  const sections=document.getElementById('wearing-acc-sections');
+  sections.innerHTML='';
+  ACC_CATS.forEach(cat=>{
+    const linked=(accByCat[cat]||[]).map(id=>getItem(id)).filter(Boolean)
+      .filter(a=>accWeatherOk(a,weather.tempC,weather.condition));
+    if(!linked.length)return;
+    const sec=document.createElement('div');
+    sec.className='acc-cat-section';
+    // ITEM 2: no label under each thumb
+    sec.innerHTML=`<div class="acc-cat-title">${CATS[cat].label}</div>
+      <div class="acc-options" id="acc-opts-${cat}">
+        ${linked.map(a=>`<div class="acc-option" id="aopt-${a.id}" onclick="selectAcc('${cat}','${a.id}')">
+          <div class="acc-option-thumb">${a.img?`<img src="${a.img}" loading="lazy">`:`<span>${a.emoji||'💍'}</span>`}</div>
+        </div>`).join('')}
+      </div>`;
+    sections.appendChild(sec);
+  });
+  document.getElementById('wearing-screen').classList.add('open');
+}
+
+function selectAcc(cat,id){
+  const el=document.getElementById(`aopt-${id}`);
+  if(el)el.classList.toggle('selected');
+}
+
+async function confirmWorn(){
+  const o=outfits.find(x=>x.id===wearingOutfitId);
+  if(!o)return;
+  const chosenAccs=[];
+  ACC_CATS.forEach(cat=>{
+    document.querySelectorAll(`#acc-opts-${cat} .acc-option.selected`).forEach(el=>{
+      chosenAccs.push(el.id.replace('aopt-',''));
+    });
+  });
+  const hasAccOptions=document.querySelectorAll('.acc-option').length>0;
+  if(hasAccOptions&&chosenAccs.length===0){
+    if(!confirm('No accessories selected — log this outfit without any?'))return;
+  }
+  const logDate=document.getElementById('wearing-date-input').value||todayStr();
+  const log={
+    id:'l'+Date.now(),date:logDate,
+    outfitId:o.id,outfitNum:o.num,
+    pieces:o.pieces,accessories:chosenAccs,
+    tempC:weather.tempC,condition:weather.condition,weatherLabel:weather.label
+  };
+  o.lastWorn=new Date().toISOString();
+  const allWorn=[...o.pieces,...chosenAccs];
+  allWorn.forEach(pid=>{const it=getItem(pid);if(it){it.lastWorn=new Date().toISOString();it.wornCount=(it.wornCount||0)+1;}});
+  wornLogs.push(log);
+  closeWearing();
+  renderCalendar();
+  showSaving();
+  await Promise.all([
+    apiCall({action:'updateOutfit',data:{...o,accByCat:JSON.stringify(o.accByCat)}}),
+    apiCall({action:'saveLog',data:log}),
+    ...allWorn.map(pid=>{const it=getItem(pid);return it?apiCall({action:'updateItem',data:it}):Promise.resolve();})
+  ]);
+  showToast('Outfit logged!');
+}
+
+function closeWearing(){
+  document.getElementById('wearing-screen').classList.remove('open');
+  wearingOutfitId=null;
+}
+
+// ===== WARDROBE =====
+function renderWardrobe(){
+  const tempFilter=document.getElementById('wardrobe-temp')?.value||'';
+  const rainFilter=document.getElementById('wardrobe-rain')?.value||'';
+  const typeFilter=document.getElementById('wardrobe-type')?.value||'';
+  const grid=document.getElementById('items-grid');
+  const isFiltered=currentCat!=='all';
+  let html='';let totalFound=0;
+
+  function applyFilters(arr){
+    return arr.filter(i=>{
+      if(tempFilter&&!((i.seasons||[]).includes(tempFilter)))return false;
+      if(rainFilter==='rainy'&&RAINY_TAG_CATS.includes(i.cat)&&!(i.conditions||[]).includes('rainy'))return false;
+      if(typeFilter==='occasion'&&!i.occasion)return false;
+      if(typeFilter==='everyday'&&i.occasion)return false;
+      if(typeFilter==='unavailable'&&!i.unavailable)return false;
+      return true;
+    });
+  }
+
+  if(isFiltered){
+    let catItems=applyFilters(items.filter(i=>i.cat===currentCat));
+    totalFound=catItems.length;
+    if(!catItems.length){grid.innerHTML='<div class="empty-state">No items match these filters.</div>';return;}
+    html=`<div class="items-grid">${catItems.map(item=>itemCard(item)).join('')}</div>`;
+  } else {
+    Object.keys(CATS).forEach(cat=>{
+      let catItems=applyFilters(items.filter(i=>i.cat===cat));
+      if(!catItems.length)return;
+      totalFound+=catItems.length;
+      html+=`<div style="margin-bottom:1.5rem;">
+        <div class="accordion-header" onclick="toggleWardrobeSection('wsec-${cat}',this)">
+          ${CATS[cat].label}
+          <span class="acc-count-pill">${catItems.length}</span>
+          <span class="acc-arrow">▸</span>
+        </div>
+        <div id="wsec-${cat}" class="items-grid" style="display:none;">${catItems.map(item=>itemCard(item)).join('')}</div>
+      </div>`;
+    });
+  }
+
+  if(!totalFound){grid.innerHTML='<div class="empty-state">No items match these filters.</div>';return;}
+  grid.innerHTML=html;
+}
+
+// ITEM 6: 4 per row — done via CSS (.items-grid uses repeat(4,1fr))
+function itemCard(item){
+  return`<div class="icard${item.unavailable?' icard-unavailable':''}" onclick="openEditModal('${item.id}')">
+    <div class="iimg">${item.img?`<img src="${item.img}" loading="lazy">`:`<span>${item.emoji||CATS[item.cat]?.emoji||'👕'}</span>`}</div>
+    <div class="imeta">
+      <div class="iworn">${item.unavailable?'🚫 ':item.occasion?'🎉 ':''} ${item.wornCount||0}× · ${daysSince(item.lastWorn)}d ago</div>
+    </div>
+  </div>`;
+}
+
+function toggleWardrobeSection(id,titleEl){
+  const body=document.getElementById(id);
+  const arrow=titleEl.querySelector('.acc-arrow');
+  const isOpen=body.style.display!=='none';
+  document.querySelectorAll('[id^="wsec-"]').forEach(b=>b.style.display='none');
+  document.querySelectorAll('.accordion-header .acc-arrow').forEach(a=>a.textContent='▸');
+  if(!isOpen){body.style.display='grid';arrow.textContent='▾';}
+}
+
+function filterCat(btn,cat){
+  currentCat=cat;
+  document.querySelectorAll('.catbtn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderWardrobe();
+}
+
+// ===== ITEM MODAL — ITEM 7: paired-in for ALL categories =====
+let pairedOutfitsForModal=[];
+const PAIRED_PER_PAGE=12;
+let pairedBulkMode=false;
+let pairedBulkSelected=new Set();
+
+function togglePairedBulkMode(){
+  pairedBulkMode=!pairedBulkMode;
+  pairedBulkSelected=new Set();
+  document.getElementById('paired-bulk-btn').textContent=pairedBulkMode?'Cancel':'Select';
+  document.getElementById('paired-bulk-delete-bar').style.display=pairedBulkMode?'block':'none';
+  renderPairedOutfits();
+}
+
+function bulkDeletePairedOutfits(){
+  if(!pairedBulkSelected.size)return;
+  pairedBulkSelected.forEach(id=>pairedMarkedForRemoval.add(id));
+  pairedBulkMode=false;
+  pairedBulkSelected=new Set();
+  document.getElementById('paired-bulk-btn').textContent='Select';
+  document.getElementById('paired-bulk-delete-bar').style.display='none';
+  renderPairedOutfits();
+}
+
+function openAddModal(){
+  editingItemId=null;
+  document.getElementById('modal-title').textContent='Add an item';
+  document.getElementById('iimg').value='';
+  document.getElementById('img-preview-box').innerHTML='No photo';
+  document.getElementById('icat').value='tops';
+  document.getElementById('modal-del-btn').style.display='none';
+  document.getElementById('worn-count-section').style.display='none';
+  document.getElementById('occasion-section').style.display='none';
+  document.getElementById('occasion-tog').classList.remove('active');
+  document.getElementById('unavailable-section').style.display='none';
+  document.getElementById('unavailable-tog').classList.remove('active');
+  document.querySelectorAll('[data-itag]').forEach(b=>b.classList.remove('active'));
+  document.getElementById('paired-outfits-section').style.display='none';
+  onCatChange('tops');
+  document.getElementById('item-modal').classList.add('open');
+}
+
+function openEditModal(id){
+  const item=items.find(i=>i.id===id);
+  if(!item)return;
+  editingItemId=id;
+  pairedMarkedForRemoval=new Set();
+  pairedPage_current=0;
+  document.getElementById('modal-title').textContent='Edit item';
+  document.getElementById('iimg').value=item.img||'';
+  document.getElementById('img-preview-box').innerHTML=item.img?`<img src="${item.img}" loading="lazy">`:'No photo';
+  document.getElementById('icat').value=item.cat;
+  document.getElementById('modal-del-btn').style.display='block';
+  document.getElementById('worn-count-section').style.display='block';
+  document.getElementById('worn-count-badge').textContent=`${CATS[item.cat]?.emoji||'👕'} Worn ${item.wornCount||0} times`;
+
+  const occSec=document.getElementById('occasion-section');
+  const occTog=document.getElementById('occasion-tog');
+  if(OCCASION_CATS.includes(item.cat)){
+    occSec.style.display='block';
+    occTog.classList.toggle('active',!!item.occasion);
+  } else {
+    occSec.style.display='none';
+    occTog.classList.remove('active');
+  }
+
+  // Unavailable toggle — available for all items when editing
+  document.getElementById('unavailable-section').style.display='block';
+  document.getElementById('unavailable-tog').classList.toggle('active',!!item.unavailable);
+
+  // ITEM 7: show paired-in for ALL categories — core pieces show outfits, accessories show outfits they're linked to
+  const pairedSec=document.getElementById('paired-outfits-section');
+  const isCore=CORE_CATS.includes(item.cat);
+  const isAcc=ACC_CATS.includes(item.cat);
+
+  if(isCore){
+    pairedOutfitsForModal=outfits.filter(o=>(o.pieces||[]).includes(item.id));
+  } else if(isAcc){
+    pairedOutfitsForModal=outfits.filter(o=>
+      Object.values(o.accByCat||{}).flat().includes(item.id)
+    );
+  } else {
+    pairedOutfitsForModal=[];
+  }
+
+  if(pairedOutfitsForModal.length){
+    pairedSec.style.display='block';
+    renderPairedOutfits();
+  } else {
+    pairedSec.style.display='none';
+  }
+
+  document.querySelectorAll('[data-itag]').forEach(b=>b.classList.remove('active'));
+  onCatChange(item.cat);
+  document.getElementById('item-modal').classList.add('open');
+  setTimeout(()=>{
+    document.querySelectorAll('[data-itag]').forEach(b=>{
+      const[group,val]=b.dataset.itag.split(':');
+      b.classList.toggle('active',(item[group+'s']||[]).includes(val));
+    });
+  },50);
+}
+
+function renderPairedOutfits(){
+  const start=pairedPage_current*PAIRED_PER_PAGE;
+  const page=pairedOutfitsForModal.slice(start,start+PAIRED_PER_PAGE);
+  const list=document.getElementById('paired-outfits-list');
+  list.innerHTML=`<div class="paired-outfits-grid">${page.map(o=>{
+    const isMarked=pairedMarkedForRemoval.has(o.id);
+    const isBulkSel=pairedBulkSelected.has(o.id);
+    const flHtml=buildFlatlayCore(o.id);
+    const clickAction=pairedBulkMode?`togglePairedBulkSelect('${o.id}')`:`togglePairedRemove('${o.id}')`;
+    return`<div class="paired-outfit-card${isMarked?' marked-remove':''}${isBulkSel?' outfit-card-selected':''}" onclick="${clickAction}">
+      ${flHtml||'<div style="height:40px;display:flex;align-items:center;justify-content:center;font-size:18px;">👗</div>'}
+      ${isMarked?'<div class="paired-remove-badge">Unlink</div>':''}
+      ${isBulkSel?'<div class="paired-remove-badge" style="background:var(--sage);">✓</div>':''}
+      ${!pairedBulkMode?`<button class="paired-outfit-open-btn" onclick="event.stopPropagation();openOutfitFromItem('${o.id}')">Open</button>`:''}
+    </div>`;
+  }).join('')}</div>`;
+
+  const totalPages=Math.ceil(pairedOutfitsForModal.length/PAIRED_PER_PAGE);
+  const pag=document.getElementById('paired-pagination');
+  if(totalPages>1){
+    pag.style.display='flex';
+    document.getElementById('paired-page-label').textContent=`${pairedPage_current+1} / ${totalPages}`;
+    document.getElementById('paired-prev').disabled=pairedPage_current===0;
+    document.getElementById('paired-next').disabled=pairedPage_current>=totalPages-1;
+  } else {
+    pag.style.display='none';
+  }
+}
+
+function togglePairedBulkSelect(outfitId){
+  if(pairedBulkSelected.has(outfitId))pairedBulkSelected.delete(outfitId);
+  else pairedBulkSelected.add(outfitId);
+  renderPairedOutfits();
+}
+
+function openOutfitFromItem(outfitId){
+  closeItemModal();
+  openOutfitDetail(outfitId,'wardrobe');
+}
+
+function togglePairedRemove(outfitId){
+  if(pairedMarkedForRemoval.has(outfitId))pairedMarkedForRemoval.delete(outfitId);
+  else pairedMarkedForRemoval.add(outfitId);
+  renderPairedOutfits();
+}
+
+function pairedPage(dir){
+  pairedPage_current+=dir;
+  renderPairedOutfits();
+}
+
+function closeItemModal(){document.getElementById('item-modal').classList.remove('open');}
+function toggleItemTag(btn){btn.classList.toggle('active');}
+
+function onCatChange(cat){
+  const weatherSec=document.getElementById('item-weather-tags');
+  const seasonGrp=document.getElementById('season-tag-group');
+  const condGrp=document.getElementById('condition-tag-group');
+  const showSeason=SEASON_TAG_CATS.includes(cat)||CORE_CATS.includes(cat);
+  const showRainy=RAINY_TAG_CATS.includes(cat);
+  weatherSec.style.display=(showSeason||showRainy)?'block':'none';
+  seasonGrp.style.display=showSeason?'block':'none';
+  condGrp.style.display=showRainy?'block':'none';
+}
+
+async function saveItemModal(){
+  const cat=document.getElementById('icat').value;
+  const rawImg=document.getElementById('iimg').value.trim();
+  if(!rawImg){showToast('Please add a Google Drive link');return;}
+  const img=toDirectUrl(rawImg)||null;
+  if(!img){showToast('Invalid link');return;}
+  const seasons=[],conditions=[];
+  document.querySelectorAll('[data-itag].active').forEach(b=>{
+    const[g,v]=b.dataset.itag.split(':');
+    if(g==='season')seasons.push(v);
+    if(g==='condition')conditions.push(v);
+  });
+  const occasion=OCCASION_CATS.includes(cat)&&document.getElementById('occasion-tog').classList.contains('active');
+  const unavailable=document.getElementById('unavailable-tog').classList.contains('active');
+  const item=items.find(i=>i.id===editingItemId);
+  const isCore=item&&CORE_CATS.includes(item.cat);
+  const isAcc=item&&ACC_CATS.includes(item.cat);
+
+  if(pairedMarkedForRemoval.size>0){
+    if(isCore){
+      // Core pieces can't be individually removed — must delete the outfit
+      showToast('To remove a core piece from an outfit, delete the outfit from the Outfits tab.');
+      pairedMarkedForRemoval.clear();
+      renderPairedOutfits();
+      return;
+    }
+    if(isAcc){
+      // Unlink accessory from marked outfits
+      const removalPromises=[];
+      pairedMarkedForRemoval.forEach(outfitId=>{
+        const o=outfits.find(x=>x.id===outfitId);
+        if(!o)return;
+        ACC_CATS.forEach(c=>{
+          if(o.accByCat[c])o.accByCat[c]=o.accByCat[c].filter(a=>a!==editingItemId);
+        });
+        o.accessories=Object.values(o.accByCat).flat();
+        removalPromises.push(apiCall({action:'updateOutfit',data:{...o,accByCat:JSON.stringify(o.accByCat)}}));
+      });
+      await Promise.all(removalPromises);
+    }
+  }
+
+  if(editingItemId){
+    if(item)Object.assign(item,{cat,img,seasons,conditions,emoji:CATS[cat].emoji,occasion,unavailable});
+    closeItemModal();renderWardrobe();showSaving();
+    await apiCall({action:'updateItem',data:item});
+    showToast('Item updated!');
+  } else {
+    const name=`${CATS[cat].label} ${items.filter(i=>i.cat===cat).length+1}`;
+    const newItem={id:'i'+Date.now(),name,cat,emoji:CATS[cat].emoji,img,seasons,conditions,occasion,unavailable,wornCount:0,lastWorn:daysAgo(0)};
+    items.push(newItem);
+    closeItemModal();renderWardrobe();showSaving();
+    await apiCall({action:'saveItem',data:newItem});
+    showToast('Item added!');
+  }
+}
+
+async function deleteCurrentItem(){
+  if(!editingItemId)return;
+  if(!confirm('Remove this item?'))return;
+  const item=items.find(i=>i.id===editingItemId);
+  const isCore=item&&CORE_CATS.includes(item.cat);
+  const affected=outfits.filter(o=>(o.pieces||[]).includes(editingItemId));
+  if(isCore&&affected.length){
+    if(!confirm(`This item is in ${affected.length} outfit${affected.length>1?'s':''}. Those outfits will also be deleted. Continue?`))return;
+    const ids=affected.map(o=>o.id);
+    items=items.filter(i=>i.id!==editingItemId);
+    outfits=outfits.filter(o=>!ids.includes(o.id));
+    closeItemModal();renderWardrobe();showSaving();
+    await apiCall({action:'deleteItem',id:editingItemId});
+    await Promise.all(ids.map(oid=>apiCall({action:'deleteOutfit',id:oid})));
+    showToast('Item and outfits removed');
+  } else {
+    items=items.filter(i=>i.id!==editingItemId);
+    outfits.forEach(o=>{
+      ACC_CATS.forEach(cat=>{if(o.accByCat[cat])o.accByCat[cat]=o.accByCat[cat].filter(a=>a!==editingItemId);});
+      o.accessories=Object.values(o.accByCat).flat();
+    });
+    closeItemModal();renderWardrobe();showSaving();
+    await apiCall({action:'deleteItem',id:editingItemId});
+    showToast('Item removed');
+  }
+}
+
+// ===== BUILD =====
+function renderBuilder(){
+  outfits=outfits.filter(x=>x.id!=='__preview__');
+  builderSel={};
+  outfitSelectMode=false;
+  document.querySelectorAll('#view-build .wtag').forEach(b=>b.classList.remove('active'));
+  const left=document.getElementById('builder-left');
+  let html='';
+  CORE_CATS.forEach(cat=>{
+    const catItems=items.filter(i=>i.cat===cat);
+    if(!catItems.length)return;
+    html+=`<div class="bsection">
+      <div class="bsec-title accordion-header" onclick="toggleBuildSection('bsec-${cat}',this)">
+        ${CATS[cat].label} <span class="acc-count-pill">${catItems.length}</span><span class="acc-arrow">▸</span>
+      </div>
+      <div class="tgrid" id="bsec-${cat}" style="display:none;"></div>
+    </div>`;
+  });
+  left.innerHTML=html||'<div class="empty-state">Add items to your wardrobe first.</div>';
+  updatePreview();
+}
+
+function toggleBuildSection(id,titleEl){
+  const body=document.getElementById(id);
+  const arrow=titleEl.querySelector('.acc-arrow');
+  const isOpen=body.style.display!=='none';
+  document.querySelectorAll('[id^="bsec-"]').forEach(b=>b.style.display='none');
+  document.querySelectorAll('#builder-left .acc-arrow').forEach(a=>a.textContent='▸');
+  if(!isOpen){
+    const cat=id.replace('bsec-','');
+    const catItems=items.filter(i=>i.cat===cat);
+    body.innerHTML=catItems.map(item=>`
+      <div class="titem" id="tog-${item.id}" onclick="togglePiece('${item.id}','${cat}')">
+        <div class="mthumb">${item.img?`<img src="${item.img}" loading="lazy">`:item.emoji||CATS[cat].emoji}</div>
+      </div>`).join('');
+    body.style.display='flex';
+    arrow.textContent='▾';
+  }
+}
+
+function togglePiece(id,cat){
+  const el=document.getElementById('tog-'+id);
+  if(cat==='tops'){
+    // Allow up to 2 tops
+    if(!builderSel.tops)builderSel.tops=[];
+    const idx=builderSel.tops.indexOf(id);
+    if(idx>-1){
+      builderSel.tops.splice(idx,1);
+      el.classList.remove('active');
+      if(!builderSel.tops.length)delete builderSel.tops;
+    } else if(builderSel.tops.length<2){
+      builderSel.tops.push(id);
+      el.classList.add('active');
+    } else {
+      // Deselect first top, select new one
+      document.getElementById('tog-'+builderSel.tops[0])?.classList.remove('active');
+      builderSel.tops.shift();
+      builderSel.tops.push(id);
+      el.classList.add('active');
+    }
+  } else {
+    if(builderSel[cat]===id){delete builderSel[cat];el.classList.remove('active');}
+    else{if(builderSel[cat])document.getElementById('tog-'+builderSel[cat])?.classList.remove('active');builderSel[cat]=id;el.classList.add('active');}
+  }
+  updatePreview();
+  applyAccGreyingInBuilder();
+}
+
+// ITEM 4: grey out accessories in builder that don't match outfit's inferred seasons
+function applyAccGreyingInBuilder(){
+  const selectedPieceIds=Object.values(builderSel);
+  const outfitSeasons=inferOutfitSeasons(selectedPieceIds);
+  document.querySelectorAll('.acc-photo-item').forEach(el=>{
+    // Extract item id from element id: "at-{cat}-{itemId}"
+    const parts=el.id.split('-');
+    if(parts.length<3)return;
+    const itemId=parts.slice(2).join('-');
+    const acc=getItem(itemId);
+    if(!acc)return;
+    const compatible=accCompatibleWithOutfit(acc,outfitSeasons);
+    el.classList.toggle('greyed',!compatible);
+    // Also unlink if now greyed
+    if(!compatible)el.classList.remove('linked');
+  });
+}
+
+function updatePreview(){
+  // Flatten builderSel: tops may be an array
+  const allPieceIds=[];
+  Object.entries(builderSel).forEach(([cat,val])=>{
+    if(Array.isArray(val))val.forEach(id=>allPieceIds.push(id));
+    else allPieceIds.push(val);
+  });
+  const selected=allPieceIds.map(getItem).filter(Boolean);
+  const pp=document.getElementById('prev-pieces');
+  const btn=document.getElementById('save-btn');
+  const extras=document.getElementById('builder-extras');
+  const nextNum=outfits.length?Math.max(...outfits.filter(x=>x.id!=='__preview__').map(o=>o.num||0))+1:1;
+  document.getElementById('prev-num').textContent=`Will save as Outfit ${nextNum}`;
+  if(!selected.length){
+    outfits=outfits.filter(x=>x.id!=='__preview__');
+    pp.innerHTML='<div class="prev-empty">Select pieces on the left</div>';
+    btn.disabled=true;extras.style.display='none';
+    document.getElementById('acc-link-content').innerHTML='';
+    return;
+  }
+  const tempAccByCat={};
+  ACC_CATS.forEach(cat=>{
+    const linked=[...document.querySelectorAll(`.acc-photo-item.linked[id^="at-${cat}-"]`)].map(el=>el.id.replace(`at-${cat}-`,''));
+    if(linked.length)tempAccByCat[cat]=linked;
+  });
+  const tempOutfit={id:'__preview__',num:0,pieces:allPieceIds,accessories:[],accByCat:tempAccByCat,seasons:[],conditions:[]};
+  const existingPreview=outfits.find(x=>x.id==='__preview__');
+  if(existingPreview)Object.assign(existingPreview,tempOutfit);
+  else outfits.push(tempOutfit);
+  pp.innerHTML=buildFlatlay('__preview__');
+  btn.disabled=false;extras.style.display='block';
+
+  const accSec=document.getElementById('acc-link-section');
+  const accContent=document.getElementById('acc-link-content');
+  const accItems=items.filter(i=>ACC_CATS.includes(i.cat));
+  if(accItems.length){
+    accSec.style.display='block';
+    if(!accContent.children.length){
+      // ITEM 4: infer seasons and grey accessories
+      const outfitSeasons=inferOutfitSeasons(allPieceIds);
+      accContent.innerHTML=ACC_CATS.map(cat=>{
+        const catAccs=items.filter(i=>i.cat===cat);
+        if(!catAccs.length)return'';
+        return`<div style="margin-bottom:14px;">
+          <div class="tg-name accordion-header" onclick="toggleBuildAccSection('bacc-${cat}',this)" style="cursor:pointer;display:flex;align-items:center;gap:6px;">
+            ${CATS[cat].label} <span class="acc-count-pill">${catAccs.length}</span><span class="acc-arrow">▸</span>
+          </div>
+          <div class="acc-photo-grid" id="bacc-${cat}" style="display:none;">
+            ${catAccs.map(a=>{
+              const greyed=!accCompatibleWithOutfit(a,outfitSeasons);
+              return`<div class="acc-photo-item${greyed?' greyed':''}" id="at-${cat}-${a.id}" onclick="if(!this.classList.contains('greyed'))this.classList.toggle('linked')">
+                <div class="acc-photo-thumb">${a.img?`<img src="${a.img}" loading="lazy">`:`<span>${a.emoji||'💍'}</span>`}</div>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>`;
+      }).join('');
+    }
+  } else accSec.style.display='none';
+}
+
+function toggleBuildAccSection(id,titleEl){
+  const body=document.getElementById(id);
+  const arrow=titleEl.querySelector('.acc-arrow');
+  const isOpen=body.style.display!=='none';
+  document.querySelectorAll('[id^="bacc-"]').forEach(b=>b.style.display='none');
+  document.querySelectorAll('#acc-link-content .acc-arrow').forEach(a=>a.textContent='▸');
+  if(!isOpen){body.style.display='flex';arrow.textContent='▾';}
+}
+
+async function saveOutfit(){
+  const pieces=[];
+  Object.entries(builderSel).forEach(([cat,val])=>{
+    if(Array.isArray(val))val.forEach(id=>pieces.push(id));
+    else pieces.push(val);
+  });
+  if(!pieces.length)return;
+  const accByCat={};
+  ACC_CATS.forEach(cat=>{
+    const linked=[...document.querySelectorAll(`.acc-photo-item.linked[id^="at-${cat}-"]`)].map(el=>el.id.replace(`at-${cat}-`,''));
+    if(linked.length)accByCat[cat]=linked;
+  });
+  const nextNum=outfits.filter(x=>x.id!=='__preview__').length?Math.max(...outfits.filter(x=>x.id!=='__preview__').map(o=>o.num||0))+1:1;
+  const outfit={
+    id:'o'+Date.now(),num:nextNum,pieces,
+    accessories:Object.values(accByCat).flat(),
+    accByCat:JSON.stringify(accByCat),
+    seasons:[],conditions:[],
+    lastWorn:daysAgo(30)
+  };
+  outfits=outfits.filter(x=>x.id!=='__preview__');
+  outfits.push({...outfit,accByCat});
+  showSaving();
+  await apiCall({action:'saveOutfit',data:{...outfit,accByCat:JSON.stringify(accByCat)}});
+  showToast(`Outfit ${nextNum} saved!`);
+  outfits=outfits.filter(x=>x.id!=='__preview__');
+  builderSel={};
+  document.querySelectorAll('.titem.active').forEach(el=>el.classList.remove('active'));
+  document.querySelectorAll('#view-build .wtag').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.acc-photo-item.linked').forEach(el=>el.classList.remove('linked'));
+  document.getElementById('acc-link-content').innerHTML='';
+  updatePreview();
+}
+
+// ===== CALENDAR =====
+function renderCalendar(){
+  const label=new Date(calYear,calMonth,1).toLocaleDateString('en-GB',{month:'long',year:'numeric'});
+  document.getElementById('cal-month-label').textContent=label;
+  const grid=document.getElementById('cal-grid');
+  const days=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  grid.innerHTML=days.map(d=>`<div class="cal-dow">${d}</div>`).join('');
+  const first=new Date(calYear,calMonth,1);
+  let startDow=first.getDay()-1;if(startDow<0)startDow=6;
+  const daysInMonth=new Date(calYear,calMonth+1,0).getDate();
+  const prevDays=new Date(calYear,calMonth,0).getDate();
+  const today=new Date();today.setHours(0,0,0,0);
+  const todStrCal=today.toLocaleDateString('en-CA');
+  for(let i=startDow-1;i>=0;i--){
+    grid.innerHTML+=`<div class="cal-day other-month"><div class="cal-day-num">${prevDays-i}</div></div>`;
+  }
+  for(let d=1;d<=daysInMonth;d++){
+    const date=new Date(calYear,calMonth,d);date.setHours(0,0,0,0);
+    const dateStr=`${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isToday=dateStr===todStrCal;
+    const isFuture=date>today;
+    const logs=wornLogs.filter(l=>normaliseDate(l.date)===dateStr);
+    const fcast=forecast.find(f=>f.date===dateStr);
+    let thumbsHtml='';
+    if(logs.length){
+      const firstLog=logs[0];
+      const firstOutfit=outfits.find(x=>x.id===firstLog.outfitId);
+      if(firstOutfit){
+        const wornAccByCat={};
+        (firstLog.accessories||[]).forEach(aid=>{const it=getItem(aid);if(it){if(!wornAccByCat[it.cat])wornAccByCat[it.cat]=[];wornAccByCat[it.cat].push(aid);}});
+        const tempId='__cal_'+firstLog.id;
+        outfits.push({...firstOutfit,id:tempId,accByCat:wornAccByCat,pieces:firstLog.pieces||firstOutfit.pieces});
+        thumbsHtml=buildFlatlay(tempId,true);
+        outfits=outfits.filter(x=>x.id!==tempId);
+      }
+    } else if(isFuture&&fcast){
+      thumbsHtml=`<div style="font-size:14px;margin-top:2px;">${fcast.icon}</div>`;
+    }
+    const cls=['cal-day',isToday?'today':''].filter(Boolean).join(' ');
+    grid.innerHTML+=`<div class="${cls}" onclick="openDayDetail('${dateStr}',${isFuture})">
+      <div class="cal-day-num">${d}</div>${thumbsHtml}</div>`;
+  }
+  const totalCells=startDow+daysInMonth;
+  const remaining=(7-totalCells%7)%7;
+  for(let i=1;i<=remaining;i++){
+    grid.innerHTML+=`<div class="cal-day other-month"><div class="cal-day-num">${i}</div></div>`;
+  }
+}
+
+function changeMonth(dir){
+  calMonth+=dir;
+  if(calMonth>11){calMonth=0;calYear++;}
+  else if(calMonth<0){calMonth=11;calYear--;}
+  renderCalendar();
+}
+
+// ===== UNAVAILABLE OUTFITS =====
+function isUnavailableOutfit(o){
+  return(o.pieces||[]).some(pid=>{const it=getItem(pid);return it&&it.unavailable;});
+}
+
+// ===== SUGGESTION PAGES (shuffle) =====
+// Keyed by dateStr, resets at midnight
+let suggestionPages={};
+let suggestionPageIndex={};
+let suggestionPageDateKey='';
+
+function getSuggestionPages(pool,dateStr){
+  const todayKey=todayStr();
+  // Reset if date changed
+  if(suggestionPageDateKey!==todayKey){
+    suggestionPages={};
+    suggestionPageIndex={};
+    suggestionPageDateKey=todayKey;
+  }
+  if(!suggestionPages[dateStr]){
+    // Build up to 3 pages of 3 suggestions each from the ranked pool
+    const used=new Set();
+    const pages=[];
+    let remaining=pool.slice();
+    for(let p=0;p<3;p++){
+      const page=getVariedSuggestions(remaining,3);
+      if(!page.length)break;
+      pages.push(page);
+      page.forEach(o=>used.add(o.id));
+      remaining=remaining.filter(o=>!used.has(o.id));
+    }
+    suggestionPages[dateStr]=pages;
+    suggestionPageIndex[dateStr]=0;
+  }
+  return suggestionPages[dateStr];
+}
+
+function renderSuggestionPage(wrap,pages,pageIdx,dateStr,isFuture,pool,tempC,cond){
+  // Ensure pages exist
+  if(!pages||!pages.length){
+    const allPages=getSuggestionPages(pool,dateStr);
+    pages=allPages;
+  }
+  wrap.innerHTML='';
+  const page=pages[pageIdx]||[];
+  if(!page.length)return;
+
+  const grid=document.createElement('div');
+  grid.style.cssText=`display:grid;grid-template-columns:repeat(${page.length},1fr);gap:8px;`;
+  page.forEach(o=>{
+    const col=document.createElement('div');
+    col.style.cssText='background:var(--cream);border-radius:var(--rsm);overflow:hidden;cursor:pointer;border:1px solid var(--border);';
+    col.innerHTML=`${buildFlatlayCore(o.id)}
+      <div style="padding:6px;display:flex;justify-content:center;">
+        <button class="wear-btn" style="font-size:10px;padding:5px 10px;" onclick="closeDayDetail();openWearing('${o.id}','${dateStr}')">Wearing this</button>
+      </div>`;
+    grid.appendChild(col);
+  });
+  wrap.appendChild(grid);
+
+  // Shuffle navigation — only show if more than 1 page
+  if(pages.length>1){
+    const nav=document.createElement('div');
+    nav.style.cssText='display:flex;align-items:center;justify-content:center;gap:10px;margin-top:8px;';
+    const prevBtn=document.createElement('button');
+    prevBtn.className='page-btn';
+    prevBtn.textContent='←';
+    prevBtn.disabled=pageIdx===0;
+    prevBtn.onclick=()=>{
+      suggestionPageIndex[dateStr]=pageIdx-1;
+      renderSuggestionPage(wrap,pages,pageIdx-1,dateStr,isFuture,pool,tempC,cond);
+    };
+    const nextBtn=document.createElement('button');
+    nextBtn.className='page-btn';
+    nextBtn.innerHTML='🔀';
+    nextBtn.title='Shuffle';
+    nextBtn.disabled=pageIdx>=pages.length-1;
+    nextBtn.onclick=()=>{
+      suggestionPageIndex[dateStr]=pageIdx+1;
+      renderSuggestionPage(wrap,pages,pageIdx+1,dateStr,isFuture,pool,tempC,cond);
+    };
+    const dots=document.createElement('span');
+    dots.style.cssText='font-size:11px;color:var(--ink-faint);';
+    dots.textContent=`${pageIdx+1} / ${pages.length}`;
+    nav.appendChild(prevBtn);
+    nav.appendChild(dots);
+    nav.appendChild(nextBtn);
+    wrap.appendChild(nav);
+  }
+}
+
+// ===== VARIETY SUGGESTIONS =====
+function getVariedSuggestions(pool,max){
+  const sorted=pool.slice().sort((a,b)=>score(b)-score(a));
+  const picks=[];
+  const usedPieces=new Set();
+
+  // Helper: get dominant core type of an outfit
+  function dominantType(o){
+    const ps=(o.pieces||[]).map(getItem).filter(Boolean);
+    if(ps.some(p=>p.cat==='dresses'))return'dress';
+    if(ps.every(p=>p.cat==='bottoms'||p.cat==='jumpers'))return'bottoms';
+    return'other';
+  }
+
+  for(const o of sorted){
+    if(picks.length>=max)break;
+    const sharesWithAny=picks.some(p=>p.pieces.some(pid=>(o.pieces||[]).includes(pid)));
+    if(!sharesWithAny){
+      // Change 5: never all dresses or all bottoms in the 3 slots
+      const candidateType=dominantType(o);
+      if(picks.length>=2){
+        const allSameType=picks.every(p=>dominantType(p)===candidateType);
+        if(allSameType&&(candidateType==='dress'||candidateType==='bottoms'))continue;
+      }
+      picks.push(o);
+      (o.pieces||[]).forEach(p=>usedPieces.add(p));
+    }
+  }
+
+  // Relax: allow sharing 1 piece between non-first picks
+  if(picks.length<max){
+    for(const o of sorted){
+      if(picks.length>=max)break;
+      if(picks.includes(o))continue;
+      const sharedWithFirst=picks[0]?(o.pieces||[]).filter(p=>picks[0].pieces.includes(p)).length:0;
+      if(sharedWithFirst>0)continue;
+      const candidateType=dominantType(o);
+      if(picks.length>=2){
+        const allSameType=picks.every(p=>dominantType(p)===candidateType);
+        if(allSameType&&(candidateType==='dress'||candidateType==='bottoms'))continue;
+      }
+      picks.push(o);
+      (o.pieces||[]).forEach(p=>usedPieces.add(p));
+    }
+  }
+
+  // Last resort: fill regardless
+  if(picks.length<max){
+    for(const o of sorted){
+      if(picks.length>=max)break;
+      if(!picks.includes(o))picks.push(o);
+    }
+  }
+
+  return picks;
+}
+
+function openDayDetail(dateStr,isFuture){
+  const date=new Date(dateStr+'T12:00:00');
+  const label=date.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'});
+  document.getElementById('sheet-title').textContent=label;
+  const fcast=forecast.find(f=>f.date===dateStr);
+  const content=document.getElementById('sheet-content');
+  content.innerHTML='';
+
+  const logs=wornLogs.filter(l=>normaliseDate(l.date)===dateStr);
+  const isToday=dateStr===todayStr();
+
+  // ITEM 3: Multiple logged outfits side by side
+  if(logs.length){
+    const weatherText=(!isFuture&&logs[0].weatherLabel)?`${logs[0].tempC}°C · ${logs[0].weatherLabel}`:(isFuture&&fcast?`${fcast.icon} ${fcast.label}, ${fcast.tempC}°C`:'');
+    document.getElementById('sheet-weather').textContent=weatherText;
+    const row=document.createElement('div');
+    row.className='logged-outfits-row';
+    logs.forEach(log=>{
+      const loggedOutfit=outfits.find(x=>x.id===log.outfitId);
+      const div=document.createElement('div');
+      div.className='logged-outfit';
+      let flatlayHtml='';
+      if(loggedOutfit){
+        const wornAccByCat={};
+        (log.accessories||[]).forEach(aid=>{
+          const it=getItem(aid);
+          if(it){if(!wornAccByCat[it.cat])wornAccByCat[it.cat]=[];wornAccByCat[it.cat].push(aid);}
+        });
+        const tempId='__log_'+log.id;
+        const existing=outfits.find(x=>x.id===tempId);
+        if(!existing)outfits.push({...loggedOutfit,id:tempId,accByCat:wornAccByCat,pieces:log.pieces||loggedOutfit.pieces});
+        else Object.assign(existing,{...loggedOutfit,id:tempId,accByCat:wornAccByCat,pieces:log.pieces||loggedOutfit.pieces});
+        flatlayHtml=buildFlatlay(tempId);
+        outfits=outfits.filter(x=>x.id!==tempId);
+      }
+      div.innerHTML=`<div class="logged-outfit-header">
+        <span class="logged-outfit-label">Outfit</span>
+        <div style="display:flex;gap:4px;">
+          <button class="logged-delete-btn" style="color:var(--ink-muted);" onclick="editLogAccFromSheet('${log.id}','${log.outfitId}')">Edit</button>
+          <button class="logged-delete-btn" onclick="deleteLog('${log.id}','${dateStr}',${isFuture})">✕</button>
+        </div>
+      </div>${flatlayHtml}`;
+      row.appendChild(div);
+    });
+    content.appendChild(row);
+  } else {
+    document.getElementById('sheet-weather').textContent=isFuture&&fcast?`${fcast.icon} ${fcast.label}, ${fcast.tempC}°C`:'';
+  }
+
+  // Suggestions — show for today and future only (not past)
+  const tempC=fcast?fcast.tempC:weather.tempC;
+  const cond=fcast?fcast.condition:weather.condition;
+  const pool=outfits.filter(o=>!isOccasionOutfit(o)&&!isUnavailableOutfit(o)&&weatherOk(o,tempC,cond));
+  const suggestions=getVariedSuggestions(pool,3);
+
+  if(isToday||isFuture){
+    if(logs.length){
+      const h=document.createElement('div');
+      h.className='suggestion-heading';
+      h.textContent='Other options';
+      content.appendChild(h);
+    }
+    if(!suggestions.length){
+      const em=document.createElement('div');
+      em.className='empty-state';
+      em.textContent='No outfits match this weather.';
+      content.appendChild(em);
+    } else {
+      const suggWrap=document.createElement('div');
+      suggWrap.id='sugg-wrap';
+      const allPages=getSuggestionPages(pool,dateStr);
+      const pageIdx=suggestionPageIndex[dateStr]||0;
+      renderSuggestionPage(suggWrap,allPages,pageIdx,dateStr,isFuture,pool,tempC,cond);
+      content.appendChild(suggWrap);
+    }
+  }
+
+  document.getElementById('day-detail').classList.add('open');
+}
+
+async function deleteLog(logId,dateStr,isFuture){
+  if(!confirm('Remove this outfit from the calendar?'))return;
+  wornLogs=wornLogs.filter(l=>l.id!==logId);
+  renderCalendar();
+  closeDayDetail();
+  openDayDetail(dateStr,isFuture);
+  showSaving();
+  await apiCall({action:'deleteLog',id:logId});
+  showToast('Removed from calendar');
+}
+
+function closeDayDetail(){document.getElementById('day-detail').classList.remove('open');}
+
+// ===== EVENTS =====
+document.getElementById('day-detail').addEventListener('click',e=>{if(e.target===document.getElementById('day-detail'))closeDayDetail();});
+document.getElementById('item-modal').addEventListener('click',e=>{if(e.target===document.getElementById('item-modal'))closeItemModal();});
+
+init();
+</script>
+</body>
+</html>
