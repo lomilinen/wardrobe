@@ -313,6 +313,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
         <option value="">All types</option>
         <option value="everyday">Everyday</option>
         <option value="occasion">🎉 Occasion</option>
+        <option value="unavailable">🚫 Unavailable</option>
       </select>
       <div id="outfits-bulk-controls" style="display:none;margin-left:auto;">
         <button class="btn-danger" style="font-size:12px;padding:7px 12px;" onclick="bulkDeleteOutfits()">Delete selected</button>
@@ -928,6 +929,7 @@ function renderOutfits(){
   if(tempFilter)outfitsFiltered=outfitsFiltered.filter(o=>outfitMatchesTempFilter(o,tempFilter));
   if(typeFilter==='occasion')outfitsFiltered=outfitsFiltered.filter(o=>isOccasionOutfit(o));
   if(typeFilter==='everyday')outfitsFiltered=outfitsFiltered.filter(o=>!isOccasionOutfit(o));
+  if(typeFilter==='unavailable')outfitsFiltered=outfitsFiltered.filter(o=>isUnavailableOutfit(o));
   outfitsFiltered.sort((a,b)=>sort==='most'?score(a)-score(b):score(b)-score(a));
   renderOutfitsPage();
 }
@@ -1390,6 +1392,7 @@ function togglePairedBulkMode(){
   pairedBulkSelected=new Set();
   document.getElementById('paired-bulk-btn').textContent=pairedBulkMode?'Cancel':'Select';
   document.getElementById('paired-bulk-delete-bar').style.display=pairedBulkMode?'block':'none';
+  // Change 2: do NOT reset page when toggling select mode
   renderPairedOutfits();
 }
 
@@ -1466,6 +1469,20 @@ function openEditModal(id){
 
   if(pairedOutfitsForModal.length){
     pairedSec.style.display='block';
+    // Change 1: different hint and behaviour for core vs acc
+    const hintEl=document.querySelector('#paired-outfits-section .fhint');
+    const bulkBtn=document.getElementById('paired-bulk-btn');
+    if(isCore){
+      if(hintEl)hintEl.textContent='Tap an outfit to delete it permanently.';
+      bulkBtn.style.display='none';
+    } else {
+      if(hintEl)hintEl.textContent='Tap an outfit to unlink this item from it. Changes apply on Save.';
+      bulkBtn.style.display='block';
+    }
+    pairedBulkMode=false;
+    pairedBulkSelected=new Set();
+    document.getElementById('paired-bulk-delete-bar').style.display='none';
+    bulkBtn.textContent='Select';
     renderPairedOutfits();
   } else {
     pairedSec.style.display='none';
@@ -1483,6 +1500,8 @@ function openEditModal(id){
 }
 
 function renderPairedOutfits(){
+  const item=items.find(i=>i.id===editingItemId);
+  const isCore=item&&CORE_CATS.includes(item.cat);
   const start=pairedPage_current*PAIRED_PER_PAGE;
   const page=pairedOutfitsForModal.slice(start,start+PAIRED_PER_PAGE);
   const list=document.getElementById('paired-outfits-list');
@@ -1490,7 +1509,14 @@ function renderPairedOutfits(){
     const isMarked=pairedMarkedForRemoval.has(o.id);
     const isBulkSel=pairedBulkSelected.has(o.id);
     const flHtml=buildFlatlayCore(o.id);
-    const clickAction=pairedBulkMode?`togglePairedBulkSelect('${o.id}')`:`togglePairedRemove('${o.id}')`;
+    let clickAction;
+    if(isCore){
+      clickAction=`deletePairedOutfit('${o.id}')`;
+    } else if(pairedBulkMode){
+      clickAction=`togglePairedBulkSelect('${o.id}')`;
+    } else {
+      clickAction=`togglePairedRemove('${o.id}')`;
+    }
     return`<div class="paired-outfit-card${isMarked?' marked-remove':''}${isBulkSel?' outfit-card-selected':''}" onclick="${clickAction}">
       ${flHtml||'<div style="height:40px;display:flex;align-items:center;justify-content:center;font-size:18px;">👗</div>'}
       ${isMarked?'<div class="paired-remove-badge">Unlink</div>':''}
@@ -1526,6 +1552,19 @@ function togglePairedRemove(outfitId){
   if(pairedMarkedForRemoval.has(outfitId))pairedMarkedForRemoval.delete(outfitId);
   else pairedMarkedForRemoval.add(outfitId);
   renderPairedOutfits();
+}
+
+async function deletePairedOutfit(outfitId){
+  if(!confirm('Delete this outfit permanently?'))return;
+  outfits=outfits.filter(o=>o.id!==outfitId);
+  pairedOutfitsForModal=pairedOutfitsForModal.filter(o=>o.id!==outfitId);
+  // Adjust page if needed
+  const totalPages=Math.ceil(pairedOutfitsForModal.length/PAIRED_PER_PAGE);
+  if(pairedPage_current>=totalPages&&pairedPage_current>0)pairedPage_current--;
+  renderPairedOutfits();
+  showSaving();
+  await apiCall({action:'deleteOutfit',id:outfitId});
+  showToast('Outfit deleted');
 }
 
 function pairedPage(dir){
@@ -1566,13 +1605,6 @@ async function saveItemModal(){
   const isAcc=item&&ACC_CATS.includes(item.cat);
 
   if(pairedMarkedForRemoval.size>0){
-    if(isCore){
-      // Core pieces can't be individually removed — must delete the outfit
-      showToast('To remove a core piece from an outfit, delete the outfit from the Outfits tab.');
-      pairedMarkedForRemoval.clear();
-      renderPairedOutfits();
-      return;
-    }
     if(isAcc){
       // Unlink accessory from marked outfits
       const removalPromises=[];
