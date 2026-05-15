@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Outfit Curation</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --cream:#F5F1EA;--warm:#FDFBF7;--ink:#1A1714;--ink-soft:#3D3935;
+  --ink-muted:#6B6560;--ink-faint:#A09A94;--border:#E4DED6;--border-mid:#C8C0B6;
+  --sage:#6B8F78;--sage-light:#EAF0EC;--sage-dark:#3E5C49;
+  --rose:#B85C5C;--rose-light:#FAE8E8;
+  --amber:#C4834A;--amber-light:#FAF0E4;
+  --r:14px;--rsm:9px;--rpill:999px;
+}
+html,body{height:100%;overflow:hidden;}
+body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;display:flex;flex-direction:column;}
+.screen{display:none;flex-direction:column;height:100%;overflow:hidden;}
+.screen.active{display:flex;}
+
+/* LOADING */
+#screen-loading{align-items:center;justify-content:center;gap:16px;padding:2rem;}
+.load-logo{font-family:'Cormorant Garamond',serif;font-size:32px;font-weight:400;text-align:center;}
+.load-logo em{font-style:italic;color:var(--ink-muted);}
+.load-sub{font-size:13px;color:var(--ink-faint);text-align:center;max-width:260px;}
+.spinner{width:28px;height:28px;border:2px solid var(--border);border-top-color:var(--sage);border-radius:50%;animation:spin .7s linear infinite;margin:0 auto;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* DONE */
+#screen-done{align-items:center;justify-content:center;gap:20px;padding:2rem;}
+.done-icon{font-size:48px;}
+.done-title{font-family:'Cormorant Garamond',serif;font-size:28px;font-weight:400;text-align:center;}
+.done-sub{font-size:13px;color:var(--ink-muted);text-align:center;line-height:1.7;max-width:280px;}
+.done-stats{display:flex;gap:12px;margin-top:8px;flex-wrap:wrap;justify-content:center;}
+.done-stat{text-align:center;background:var(--warm);border:1px solid var(--border);border-radius:var(--r);padding:14px 20px;}
+.done-stat-num{font-family:'Cormorant Garamond',serif;font-size:32px;font-weight:400;}
+.done-stat-label{font-size:11px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.06em;}
+.done-btn{padding:12px 28px;border-radius:var(--rpill);background:var(--ink);color:var(--warm);border:none;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;margin-top:8px;}
+
+/* HEADER */
+.cur-header{padding:.875rem 1.25rem .75rem;border-bottom:1px solid var(--border);background:var(--warm);flex-shrink:0;display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.cur-logo{font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:400;white-space:nowrap;}
+.cur-logo em{font-style:italic;color:var(--ink-muted);}
+.cur-progress-wrap{flex:1;}
+.cur-progress-bar{height:3px;background:var(--border);border-radius:3px;overflow:hidden;}
+.cur-progress-fill{height:100%;background:var(--sage);border-radius:3px;transition:width .4s ease;}
+.cur-progress-label{font-size:10px;color:var(--ink-faint);margin-top:4px;text-align:right;}
+
+/* PHASE BANNER */
+.phase-banner{padding:6px 1.25rem;border-bottom:1px solid var(--border);background:var(--sage-light);flex-shrink:0;display:flex;align-items:center;gap:6px;}
+.phase-pip{width:8px;height:8px;border-radius:50%;background:var(--border);flex-shrink:0;}
+.phase-pip.active{background:var(--sage);}
+.phase-pip.done{background:var(--sage-dark);}
+.phase-desc{font-size:11px;color:var(--ink-muted);margin-left:4px;}
+.phase-desc strong{color:var(--sage-dark);}
+
+/* RESUME BANNER */
+.resume-banner{background:var(--amber-light);border-bottom:1px solid var(--border);padding:.625rem 1.25rem;flex-shrink:0;font-size:12px;color:var(--ink-soft);display:none;}
+.resume-banner.show{display:block;}
+
+/* MAIN CONTENT */
+.main-content{flex:1;overflow-y:auto;padding:1rem 1.25rem 1.5rem;}
+
+/* HERO */
+.hero{display:flex;gap:14px;align-items:flex-start;margin-bottom:1rem;}
+.hero-img{width:86px;height:86px;border-radius:var(--r);border:1px solid var(--border);background:var(--cream);overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:34px;flex-shrink:0;}
+.hero-img img{width:100%;height:100%;object-fit:contain;}
+.hero-info{flex:1;padding-top:4px;}
+.hero-phase{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-faint);margin-bottom:4px;}
+.hero-title{font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:400;line-height:1.3;}
+.hero-sub{font-size:12px;color:var(--ink-muted);margin-top:3px;}
+
+/* INSTRUCTION */
+.instruction{font-size:12px;color:var(--ink-muted);margin-bottom:12px;line-height:1.6;padding:8px 10px;background:var(--cream);border-radius:var(--rsm);border:1px solid var(--border);}
+
+/* ITEM GRID */
+.item-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:1rem;}
+@media(min-width:480px){.item-grid{grid-template-columns:repeat(4,1fr);}}
+.item-card{border-radius:var(--rsm);border:2px solid var(--border);background:var(--warm);overflow:hidden;cursor:pointer;transition:border-color .15s,box-shadow .15s;position:relative;}
+.item-card:active{transform:scale(.97);}
+.item-card.selected{border-color:var(--sage);box-shadow:0 0 0 1px var(--sage);}
+.item-card-img{width:100%;aspect-ratio:1;background:var(--cream);display:flex;align-items:center;justify-content:center;font-size:30px;overflow:hidden;}
+.item-card-img img{width:100%;height:100%;object-fit:contain;}
+.item-check{position:absolute;top:5px;right:5px;width:20px;height:20px;border-radius:50%;background:var(--sage);display:none;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;}
+.item-card.selected .item-check{display:flex;}
+
+/* PAIR CONTEXT */
+.pair-context{display:flex;gap:8px;align-items:center;padding:10px;background:var(--cream);border-radius:var(--rsm);border:1px solid var(--border);margin-bottom:10px;}
+.pair-thumb{width:54px;height:54px;border-radius:var(--rsm);border:1px solid var(--border);background:var(--warm);overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
+.pair-thumb img{width:100%;height:100%;object-fit:contain;}
+.pair-plus{font-size:14px;color:var(--ink-faint);}
+.pair-info{flex:1;font-size:11px;color:var(--ink-muted);line-height:1.6;}
+
+/* PAIR DOTS */
+.pair-dots{display:flex;gap:5px;margin-bottom:12px;flex-wrap:wrap;}
+.pair-dot{width:7px;height:7px;border-radius:50%;background:var(--border);}
+.pair-dot.done{background:var(--sage-dark);}
+.pair-dot.current{background:var(--sage);}
+
+/* CONTINUE BAR */
+.continue-bar{flex-shrink:0;padding:.875rem 1.25rem;border-top:1px solid var(--border);background:var(--warm);display:flex;gap:8px;}
+.btn-continue{flex:1;padding:13px;border-radius:var(--rsm);background:var(--ink);color:var(--warm);border:none;font-size:14px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;}
+.btn-continue:disabled{opacity:.35;cursor:not-allowed;}
+.btn-secondary{padding:13px 14px;border-radius:var(--rsm);border:1px solid var(--border);background:none;font-size:13px;color:var(--ink-muted);cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;}
+
+/* SAVING / TOAST */
+.saving-pill{position:fixed;top:1rem;right:1rem;font-size:11px;color:var(--ink-faint);background:var(--warm);border:1px solid var(--border);border-radius:var(--rpill);padding:4px 10px;z-index:50;opacity:0;transition:opacity .3s;pointer-events:none;}
+.saving-pill.show{opacity:1;}
+.toast{position:fixed;bottom:2rem;left:50%;transform:translateX(-50%) translateY(80px);background:var(--ink);color:var(--warm);padding:10px 20px;border-radius:var(--rpill);font-size:13px;z-index:200;transition:transform .3s;pointer-events:none;white-space:nowrap;}
+.toast.show{transform:translateX(-50%) translateY(0);}
+.empty-state{text-align:center;padding:2rem 1rem;color:var(--ink-faint);font-size:13px;line-height:1.9;}
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div class="screen active" id="screen-loading">
+  <div class="load-logo">outfit <em>curation</em></div>
+  <div class="spinner"></div>
+  <div class="load-sub" id="load-status">Loading your wardrobe...</div>
+</div>
+
+<!-- PHASE 1: for each top, pick bottoms -->
+<div class="screen" id="screen-p1">
+  <div class="cur-header">
+    <div class="cur-logo">outfit <em>curation</em></div>
+    <div class="cur-progress-wrap">
+      <div class="cur-progress-bar"><div class="cur-progress-fill" id="p1-bar" style="width:0%"></div></div>
+      <div class="cur-progress-label" id="p1-label"></div>
+    </div>
+  </div>
+  <div class="phase-banner">
+    <div class="phase-pip active"></div><div class="phase-pip"></div><div class="phase-pip"></div>
+    <div class="phase-desc"><strong>Phase 1</strong> — Tops: pick bottoms · Dresses: pick jumpers</div>
+  </div>
+  <div class="resume-banner" id="p1-resume"></div>
+  <div class="main-content" id="p1-content"></div>
+  <div class="continue-bar">
+    <button class="btn-secondary" onclick="skipTop()">Skip →</button>
+    <button class="btn-continue" id="p1-btn" onclick="confirmP1()" disabled>Continue →</button>
+  </div>
+</div>
+
+<!-- PHASE 2: for each bottom, trim tops -->
+<div class="screen" id="screen-p2">
+  <div class="cur-header">
+    <div class="cur-logo">outfit <em>curation</em></div>
+    <div class="cur-progress-wrap">
+      <div class="cur-progress-bar"><div class="cur-progress-fill" id="p2-bar" style="width:0%"></div></div>
+      <div class="cur-progress-label" id="p2-label"></div>
+    </div>
+  </div>
+  <div class="phase-banner">
+    <div class="phase-pip done"></div><div class="phase-pip active"></div><div class="phase-pip"></div>
+    <div class="phase-desc"><strong>Phase 2</strong> — Which tops truly work with this bottom?</div>
+  </div>
+  <div class="main-content" id="p2-content"></div>
+  <div class="continue-bar">
+    <button class="btn-secondary" onclick="skipBottom()">None →</button>
+    <button class="btn-continue" id="p2-btn" onclick="confirmP2()">Confirm →</button>
+  </div>
+</div>
+
+<!-- PHASE 3: for each confirmed pair, pick jumpers -->
+<div class="screen" id="screen-p3">
+  <div class="cur-header">
+    <div class="cur-logo">outfit <em>curation</em></div>
+    <div class="cur-progress-wrap">
+      <div class="cur-progress-bar"><div class="cur-progress-fill" id="p3-bar" style="width:0%"></div></div>
+      <div class="cur-progress-label" id="p3-label"></div>
+    </div>
+  </div>
+  <div class="phase-banner">
+    <div class="phase-pip done"></div><div class="phase-pip done"></div><div class="phase-pip active"></div>
+    <div class="phase-desc"><strong>Phase 3</strong> — Pick jumpers for this confirmed pair</div>
+  </div>
+  <div class="main-content" id="p3-content"></div>
+  <div class="continue-bar">
+    <button class="btn-secondary" onclick="skipPair()">No jumper →</button>
+    <button class="btn-continue" id="p3-btn" onclick="confirmP3()">Save & next →</button>
+  </div>
+</div>
+
+<!-- DONE -->
+<div class="screen" id="screen-done">
+  <div class="done-icon">✨</div>
+  <div class="done-title">All done!</div>
+  <div class="done-sub" id="done-sub">Every phase complete.</div>
+  <div class="done-stats">
+    <div class="done-stat"><div class="done-stat-num" id="stat-outfits">0</div><div class="done-stat-label">Outfits saved</div></div>
+    <div class="done-stat"><div class="done-stat-num" id="stat-pairs">0</div><div class="done-stat-label">Pairs confirmed</div></div>
+  </div>
+  <button class="done-btn" onclick="location.reload()">New session</button>
+</div>
+
+<div class="saving-pill" id="saving-pill">Saving...</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const API = 'https://script.google.com/macros/s/AKfycbx07IkbG4IsgQtQPvNo1mCyWfm7cIgM9GBq5zSvrWzBQx3_RXHT2RlqcRBfvvPwpCTk/exec';
+
+let itemsMap={}, allTops=[], allBottoms=[], allJumpers=[], allDresses=[];
+let existingOutfitKeys=new Set();
+
+// Progress
+let p1DoneTops=new Set();
+let p1DoneDresses=new Set();  // dressId → done in p1 jumper step
+let p1Selections={};         // topId → Set<bottomId>
+let p2DoneBottoms=new Set();
+let confirmedPairs=new Set(); // "topId|bottomId"
+let p3DonePairs=new Set();    // "topId|bottomId"
+
+// Session state
+let p1Queue=[], p1Idx=0;
+let p2Queue=[], p2Idx=0;
+let p3Queue=[], p3Idx=0;
+let currentPhase=1;
+let stats={outfits:0,pairs:0};
+let savingTimer=null, _maxNumCache=null;
+
+async function apiCall(params){
+  const qs=Object.entries(params).map(([k,v])=>`${encodeURIComponent(k)}=${encodeURIComponent(typeof v==='object'?JSON.stringify(v):v)}`).join('&');
+  const r=await fetch(`${API}?${qs}`);
+  return r.json();
+}
+async function saveProgress(key,decision,extra={}){
+  return apiCall({action:'saveCurationDecision',data:{key,decision,reason:extra.reason||'',bottomId:extra.bottomId||'',jumperId:extra.jumperId||'',topId:extra.topId||''}});
+}
+function showSaving(){const el=document.getElementById('saving-pill');el.classList.add('show');clearTimeout(savingTimer);savingTimer=setTimeout(()=>el.classList.remove('show'),1800);}
+function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200);}
+function showScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');}
+function setStatus(msg){document.getElementById('load-status').textContent=msg;}
+
+function toDirectUrl(url){
+  if(!url||!url.trim())return null;
+  url=url.trim();
+  if(url.includes('lh3.googleusercontent.com'))return url;
+  if(url.includes('drive.google.com')){const m=url.match(/\/d\/([a-zA-Z0-9_-]+)/);return m?`https://lh3.googleusercontent.com/d/${m[1]}`:null;}
+  if(url.includes('dropbox.com')||url.includes('dropboxusercontent.com')){url=url.replace('www.dropbox.com','dl.dropboxusercontent.com');url=url.replace(/[?&]st=[^&]*/g,'').replace(/[?&]dl=\d/g,'');return url;}
+  return url;
+}
+
+function thumbHtml(item){
+  if(!item)return`<span style="font-size:28px;">👕</span>`;
+  const url=toDirectUrl(item.img);
+  if(url)return`<img src="${url}" loading="lazy" style="width:100%;height:100%;object-fit:contain;" onerror="this.style.display='none'">`;
+  return`<span style="font-size:28px;">${item.emoji||'👕'}</span>`;
+}
+
+function makeCard(item,prefix){
+  const card=document.createElement('div');
+  card.className='item-card';
+  card.id=`${prefix}${item.id}`;
+  card.innerHTML=`<div class="item-card-img">${thumbHtml(item)}</div><div class="item-check">✓</div>`;
+  card.onclick=()=>card.classList.toggle('selected');
+  return card;
+}
+
+// ── INIT ──────────────────────────────────────────────────────
+async function init(){
+  try{
+    setStatus('Loading wardrobe...');
+    const [itemsRaw,outfitsRaw,progressRaw]=await Promise.all([
+      apiCall({action:'getItems'}),
+      apiCall({action:'getOutfits'}),
+      apiCall({action:'getCurationProgress'}),
+    ]);
+
+    (Array.isArray(itemsRaw)?itemsRaw:[]).forEach(item=>{
+      let img=item.img||'';
+      if(img.includes('&st='))img=img.replace(/&st=[^&]*/,'');
+      itemsMap[item.id]={...item,img};
+    });
+    allTops=Object.values(itemsMap).filter(i=>i.cat==='tops');
+    allBottoms=Object.values(itemsMap).filter(i=>i.cat==='bottoms');
+    allJumpers=Object.values(itemsMap).filter(i=>i.cat==='jumpers');
+    allDresses=Object.values(itemsMap).filter(i=>i.cat==='dresses');
+
+    setStatus('Indexing outfits...');
+    (Array.isArray(outfitsRaw)?outfitsRaw:[]).forEach(o=>{
+      let pieces;try{pieces=JSON.parse(o.pieces||'[]');}catch{pieces=[];}
+      if(Array.isArray(pieces)&&pieces.length)existingOutfitKeys.add(pieces.slice().sort().join('|'));
+    });
+
+    setStatus('Restoring progress...');
+    (Array.isArray(progressRaw)?progressRaw:[]).forEach(row=>{
+      const key=String(row.key||'').trim();
+      const dec=String(row.decision||'').trim();
+      if(dec==='undo')return;
+      if(key.startsWith('c3_p1_done:'))p1DoneTops.add(key.replace('c3_p1_done:',''));
+      else if(key.startsWith('c3_dress_done:'))p1DoneDresses.add(key.replace('c3_dress_done:',''));
+      else if(key.startsWith('c3_p1_sel:')){const[t,b]=key.replace('c3_p1_sel:','').split('|');if(!p1Selections[t])p1Selections[t]=new Set();p1Selections[t].add(b);}
+      else if(key.startsWith('c3_p2_done:'))p2DoneBottoms.add(key.replace('c3_p2_done:',''));
+      else if(key.startsWith('c3_p2_confirmed:'))confirmedPairs.add(key.replace('c3_p2_confirmed:',''));
+      else if(key.startsWith('c3_p3_done:'))p3DonePairs.add(key.replace('c3_p3_done:',''));
+    });
+
+    buildQueues();
+    resume();
+  }catch(e){setStatus('Error loading. Please refresh.');console.error(e);}
+}
+
+function buildQueues(){
+  // Interleave tops and dresses randomly in p1
+  const pendingTops=allTops.filter(t=>!p1DoneTops.has(t.id)).map(t=>({id:t.id,type:'top'}));
+  const pendingDresses=allDresses.filter(d=>!p1DoneDresses.has(d.id)).map(d=>({id:d.id,type:'dress'}));
+  p1Queue=[...pendingTops,...pendingDresses].sort(()=>Math.random()-.5).map(x=>x);
+  console.log(`buildQueues: ${allTops.length} tops total, ${p1DoneTops.size} done, ${pendingTops.length} pending`);
+  console.log(`buildQueues: ${allDresses.length} dresses total, ${p1DoneDresses.size} done, ${pendingDresses.length} pending`);
+  console.log(`buildQueues: p1Queue length = ${p1Queue.length}`);
+  const allSel=new Set(Object.values(p1Selections).flatMap(s=>[...s]));
+  p2Queue=[...allSel].filter(b=>!p2DoneBottoms.has(b)&&itemsMap[b]).sort(()=>Math.random()-.5);
+  p3Queue=[...confirmedPairs].filter(k=>!p3DonePairs.has(k)).map(k=>{const[t,b]=k.split('|');return{topId:t,bottomId:b};}).filter(p=>itemsMap[p.topId]&&itemsMap[p.bottomId]).sort(()=>Math.random()-.5);
+}
+
+function resume(){
+  if(p3Queue.length>0){currentPhase=3;p3Idx=0;renderP3();showScreen('screen-p3');return;}
+  // If all tops and dresses are done, move to p2
+  const allP1Done=p1Queue.length===0;
+  if(allP1Done){
+    const allSel=new Set(Object.values(p1Selections).flatMap(s=>[...s]));
+    p2Queue=[...allSel].filter(b=>!p2DoneBottoms.has(b)&&itemsMap[b]).sort(()=>Math.random()-.5);
+    if(p2Queue.length>0){currentPhase=2;p2Idx=0;renderP2();showScreen('screen-p2');return;}
+  }
+  if(p1Queue.length>0){currentPhase=1;p1Idx=0;renderP1();showScreen('screen-p1');return;}
+  showDone();
+}
+
+// ── PHASE 1 ───────────────────────────────────────────────────
+function renderP1(){
+  if(p1Idx>=p1Queue.length){
+    // All tops and dresses done for this session — rebuild p2 queue and transition
+    const allSel=new Set(Object.values(p1Selections).flatMap(s=>[...s]));
+    p2Queue=[...allSel].filter(b=>!p2DoneBottoms.has(b)&&itemsMap[b]).sort(()=>Math.random()-.5);
+    if(p2Queue.length>0){currentPhase=2;p2Idx=0;renderP2();showScreen('screen-p2');}
+    else showDone();
+    return;
+  }
+  const entry=p1Queue[p1Idx];
+  const isDress=entry.type==='dress';
+
+  if(isDress){
+    renderP1Dress(entry.id);
+  } else {
+    renderP1Top(entry.id);
+  }
+}
+
+function renderP1Top(topId){
+  const top=itemsMap[topId];
+  const totalTops=allTops.filter(t=>!p1DoneTops.has(t.id)||p1DoneTops.has(t.id)).length;
+  const doneTops=p1DoneTops.size;
+  const total=p1Queue.length+(p1DoneTops.size+p1DoneDresses.size);
+  const done=p1DoneTops.size+p1DoneDresses.size;
+  document.getElementById('p1-bar').style.width=(total?Math.round(done/total*100):0)+'%';
+  document.getElementById('p1-label').textContent=`${done} / ${total} items`;
+
+  const resumeEl=document.getElementById('p1-resume');
+  if(done>0){resumeEl.classList.add('show');resumeEl.textContent=`↩ Resuming — ${done} item${done>1?'s':''} already done`;}
+  else resumeEl.classList.remove('show');
+
+  const c=document.getElementById('p1-content');
+  c.innerHTML='';
+  const hero=document.createElement('div');
+  hero.className='hero';
+  hero.innerHTML=`<div class="hero-img">${thumbHtml(top)}</div><div class="hero-info"><div class="hero-phase">Top · item ${done+1} of ${total}</div><div class="hero-title">${top?.name||'Top'}</div><div class="hero-sub">${allBottoms.length} bottoms to choose from</div></div>`;
+  c.appendChild(hero);
+  const instr=document.createElement('div');
+  instr.className='instruction';
+  instr.textContent='Tap every bottom that could work with this top. Be generous here — Phase 2 will help you trim down.';
+  c.appendChild(instr);
+  const grid=document.createElement('div');
+  grid.className='item-grid';
+  allBottoms.forEach(b=>{
+    const card=makeCard(b,'p1-');
+    card.onclick=()=>{card.classList.toggle('selected');document.getElementById('p1-btn').disabled=document.querySelectorAll('#p1-content .item-card.selected').length===0;};
+    grid.appendChild(card);
+  });
+  c.appendChild(grid);
+  document.getElementById('p1-btn').disabled=true;
+  document.getElementById('p1-btn').textContent='Continue →';
+}
+
+function renderP1Dress(dressId){
+  const dress=itemsMap[dressId];
+  const total=p1Queue.length+(p1DoneTops.size+p1DoneDresses.size);
+  const done=p1DoneTops.size+p1DoneDresses.size;
+  document.getElementById('p1-bar').style.width=(total?Math.round(done/total*100):0)+'%';
+  document.getElementById('p1-label').textContent=`${done} / ${total} items`;
+
+  const resumeEl=document.getElementById('p1-resume');
+  if(done>0){resumeEl.classList.add('show');resumeEl.textContent=`↩ Resuming — ${done} item${done>1?'s':''} already done`;}
+  else resumeEl.classList.remove('show');
+
+  // Filter jumpers not already paired with this dress
+  const validJumpers=allJumpers.filter(j=>!existingOutfitKeys.has([dressId,j.id].sort().join('|')));
+
+  const c=document.getElementById('p1-content');
+  c.innerHTML='';
+  const hero=document.createElement('div');
+  hero.className='hero';
+  hero.innerHTML=`<div class="hero-img">${thumbHtml(dress)}</div><div class="hero-info"><div class="hero-phase">Dress · item ${done+1} of ${total}</div><div class="hero-title">${dress?.name||'Dress'}</div><div class="hero-sub">${validJumpers.length} jumpers available</div></div>`;
+  c.appendChild(hero);
+  const instr=document.createElement('div');
+  instr.className='instruction';
+  instr.textContent='Which jumpers work with this dress? Tap all that apply.';
+  c.appendChild(instr);
+
+  if(!validJumpers.length){
+    const em=document.createElement('div');em.className='empty-state';em.textContent='All jumpers already saved with this dress.';c.appendChild(em);
+    document.getElementById('p1-btn').disabled=false;
+    document.getElementById('p1-btn').textContent='Next →';
+    return;
+  }
+
+  const grid=document.createElement('div');
+  grid.className='item-grid';
+  validJumpers.forEach(j=>{
+    const card=makeCard(j,'pd-');
+    grid.appendChild(card);
+  });
+  c.appendChild(grid);
+  document.getElementById('p1-btn').disabled=false;
+  document.getElementById('p1-btn').textContent='Save & next →';
+}
+
+async function confirmP1(){
+  const entry=p1Queue[p1Idx];
+  if(entry.type==='dress'){
+    await confirmP1Dress(entry.id);
+  } else {
+    await confirmP1Top(entry.id);
+  }
+}
+
+async function confirmP1Top(topId){
+  const selected=[...document.querySelectorAll('#p1-content .item-card.selected')].map(el=>el.id.replace('p1-',''));
+  if(!p1Selections[topId])p1Selections[topId]=new Set();
+  selected.forEach(b=>p1Selections[topId].add(b));
+  showSaving();
+  await Promise.all([
+    ...selected.map(b=>saveProgress(`c3_p1_sel:${topId}|${b}`,'p1_selected',{topId,bottomId:b})),
+    saveProgress(`c3_p1_done:${topId}`,'p1_top_done',{topId}),
+  ]);
+  p1DoneTops.add(topId);
+  p1Idx++;
+  renderP1();
+}
+
+async function confirmP1Dress(dressId){
+  const selected=[...document.querySelectorAll('#p1-content .item-card.selected')].map(el=>el.id.replace('pd-',''));
+  if(selected.length>0){
+    const now=new Date(Date.now()-30*24*60*60*1000).toISOString();
+    const maxNum=await getMaxOutfitNum();
+    showSaving();
+    await Promise.all(selected.map((jumperId,i)=>{
+      const key=[dressId,jumperId].sort().join('|');
+      existingOutfitKeys.add(key);
+      if(_maxNumCache!==null)_maxNumCache++;
+      stats.outfits++;
+      return apiCall({action:'saveOutfit',data:{id:'o'+Date.now()+'_'+i,num:maxNum+1+i,pieces:JSON.stringify([dressId,jumperId]),accessories:'[]',accByCat:'{}',seasons:'[]',conditions:'[]',lastWorn:now}});
+    }));
+    showToast(`♥ ${selected.length} outfit${selected.length>1?'s':''} saved!`);
+  }
+  await saveProgress(`c3_dress_done:${dressId}`,'dress_done',{bottomId:dressId});
+  p1DoneDresses.add(dressId);
+  p1Idx++;
+  renderP1();
+}
+
+async function skipTop(){
+  const entry=p1Queue[p1Idx];
+  showSaving();
+  if(entry.type==='dress'){
+    await saveProgress(`c3_dress_done:${entry.id}`,'dress_skipped',{bottomId:entry.id});
+    p1DoneDresses.add(entry.id);
+  } else {
+    await saveProgress(`c3_p1_done:${entry.id}`,'p1_top_skipped',{topId:entry.id});
+    p1DoneTops.add(entry.id);
+  }
+  p1Idx++;
+  renderP1();
+}
+
+// ── PHASE 2 ───────────────────────────────────────────────────
+function renderP2(){
+  if(p2Idx>=p2Queue.length){
+    buildQueues();
+    if(p3Queue.length>0){currentPhase=3;p3Idx=0;renderP3();showScreen('screen-p3');}
+    else showDone();
+    return;
+  }
+  const bottomId=p2Queue[p2Idx];
+  const bottom=itemsMap[bottomId];
+  const total=p2Queue.length+p2DoneBottoms.size;
+  const done=p2DoneBottoms.size;
+  document.getElementById('p2-bar').style.width=(total?Math.round(done/total*100):0)+'%';
+  document.getElementById('p2-label').textContent=`${done} / ${total} bottoms`;
+
+  const topsForBottom=Object.entries(p1Selections).filter(([t,bs])=>bs.has(bottomId)).map(([t])=>t).filter(t=>itemsMap[t]);
+
+  const c=document.getElementById('p2-content');
+  c.innerHTML='';
+  const hero=document.createElement('div');
+  hero.className='hero';
+  hero.innerHTML=`<div class="hero-img">${thumbHtml(bottom)}</div><div class="hero-info"><div class="hero-phase">Bottom ${done+1} of ${total}</div><div class="hero-title">${bottom?.name||'Bottom'}</div><div class="hero-sub">${topsForBottom.length} top${topsForBottom.length!==1?'s':''} selected this bottom in Phase 1</div></div>`;
+  c.appendChild(hero);
+  const instr=document.createElement('div');
+  instr.className='instruction';
+  instr.textContent='These are the tops that matched this bottom in Phase 1. Now be selective — keep only the ones that truly work best together.';
+  c.appendChild(instr);
+
+  if(!topsForBottom.length){
+    const em=document.createElement('div');em.className='empty-state';em.textContent='No tops matched this bottom.';c.appendChild(em);
+    document.getElementById('p2-btn').disabled=true;return;
+  }
+  const grid=document.createElement('div');
+  grid.className='item-grid';
+  topsForBottom.forEach(topId=>{
+    const card=makeCard(itemsMap[topId],'p2-');
+    grid.appendChild(card);
+  });
+  c.appendChild(grid);
+  document.getElementById('p2-btn').disabled=false;
+}
+
+async function confirmP2(){
+  const bottomId=p2Queue[p2Idx];
+  const selected=[...document.querySelectorAll('#p2-content .item-card.selected')].map(el=>el.id.replace('p2-',''));
+  showSaving();
+  const saves=[saveProgress(`c3_p2_done:${bottomId}`,'p2_bottom_done',{bottomId})];
+  selected.forEach(topId=>{
+    confirmedPairs.add(`${topId}|${bottomId}`);
+    saves.push(saveProgress(`c3_p2_confirmed:${topId}|${bottomId}`,'p2_confirmed',{topId,bottomId}));
+    stats.pairs++;
+  });
+  await Promise.all(saves);
+  p2DoneBottoms.add(bottomId);
+  p2Idx++;
+  renderP2();
+}
+
+async function skipBottom(){
+  const bottomId=p2Queue[p2Idx];
+  showSaving();
+  await saveProgress(`c3_p2_done:${bottomId}`,'p2_bottom_skipped',{bottomId});
+  p2DoneBottoms.add(bottomId);
+  p2Idx++;
+  renderP2();
+}
+
+// ── PHASE 3 ───────────────────────────────────────────────────
+function renderP3(){
+  if(p3Idx>=p3Queue.length){showDone();return;}
+  const{topId,bottomId}=p3Queue[p3Idx];
+  const top=itemsMap[topId],bottom=itemsMap[bottomId];
+  const total=p3Queue.length+p3DonePairs.size;
+  const done=p3DonePairs.size;
+  document.getElementById('p3-bar').style.width=(total?Math.round(done/total*100):0)+'%';
+  document.getElementById('p3-label').textContent=`${done} / ${total} pairs`;
+
+  const dotsHtml=p3Queue.map((p,i)=>{
+    const k=`${p.topId}|${p.bottomId}`;
+    const cls=p3DonePairs.has(k)?'done':i===p3Idx?'current':'';
+    return`<div class="pair-dot ${cls}"></div>`;
+  }).join('');
+
+  const validJumpers=allJumpers.filter(j=>!existingOutfitKeys.has([topId,bottomId,j.id].sort().join('|')));
+
+  const c=document.getElementById('p3-content');
+  c.innerHTML='';
+  const ctx=document.createElement('div');
+  ctx.innerHTML=`
+    <div class="hero-phase" style="margin-bottom:8px;">Pair ${done+1} of ${total}</div>
+    <div class="pair-context">
+      <div class="pair-thumb">${thumbHtml(top)}</div>
+      <div class="pair-plus">+</div>
+      <div class="pair-thumb">${thumbHtml(bottom)}</div>
+      <div class="pair-info">${top?.name||'Top'}<br>${bottom?.name||'Bottom'}</div>
+    </div>
+    <div class="pair-dots">${dotsHtml}</div>`;
+  c.appendChild(ctx);
+
+  if(!validJumpers.length){
+    const em=document.createElement('div');em.className='empty-state';em.textContent='All jumpers already saved with this pair.';c.appendChild(em);
+    return;
+  }
+  const instr=document.createElement('div');
+  instr.className='instruction';
+  instr.textContent='Tap every jumper that works with this top and bottom together. Tap again to deselect.';
+  c.appendChild(instr);
+  const grid=document.createElement('div');
+  grid.className='item-grid';
+  validJumpers.forEach(j=>{
+    const card=makeCard(j,'p3-');
+    grid.appendChild(card);
+  });
+  c.appendChild(grid);
+}
+
+async function confirmP3(){
+  const{topId,bottomId}=p3Queue[p3Idx];
+  const pairKey=`${topId}|${bottomId}`;
+  const selected=[...document.querySelectorAll('#p3-content .item-card.selected')].map(el=>el.id.replace('p3-',''));
+  if(selected.length>0){
+    const now=new Date(Date.now()-30*24*60*60*1000).toISOString();
+    const maxNum=await getMaxOutfitNum();
+    showSaving();
+    await Promise.all(selected.map((jumperId,i)=>{
+      const key=[topId,bottomId,jumperId].sort().join('|');
+      existingOutfitKeys.add(key);
+      if(_maxNumCache!==null)_maxNumCache++;
+      stats.outfits++;
+      return apiCall({action:'saveOutfit',data:{id:'o'+Date.now()+'_'+i,num:maxNum+1+i,pieces:JSON.stringify([topId,bottomId,jumperId]),accessories:'[]',accByCat:'{}',seasons:'[]',conditions:'[]',lastWorn:now}});
+    }));
+    showToast(`♥ ${selected.length} outfit${selected.length>1?'s':''} saved!`);
+  }
+  p3DonePairs.add(pairKey);
+  await saveProgress(`c3_p3_done:${pairKey}`,'p3_pair_done',{topId,bottomId});
+  p3Idx++;
+  renderP3();
+  document.getElementById('p3-content').scrollTop=0;
+}
+
+async function skipPair(){
+  const{topId,bottomId}=p3Queue[p3Idx];
+  const pairKey=`${topId}|${bottomId}`;
+  p3DonePairs.add(pairKey);
+  showSaving();
+  await saveProgress(`c3_p3_done:${pairKey}`,'p3_pair_skipped',{topId,bottomId});
+  p3Idx++;
+  renderP3();
+}
+
+async function getMaxOutfitNum(){
+  if(_maxNumCache!==null)return _maxNumCache;
+  const outfits=await apiCall({action:'getOutfits'});
+  _maxNumCache=Array.isArray(outfits)?Math.max(0,...outfits.map(o=>Number(o.num)||0)):0;
+  return _maxNumCache;
+}
+
+function showDone(){
+  document.getElementById('stat-outfits').textContent=stats.outfits.toLocaleString();
+  document.getElementById('stat-pairs').textContent=stats.pairs.toLocaleString();
+  let sub='All three phases complete. Your outfits have been saved.';
+  if(p1Queue.length===0&&p2Queue.length===0&&p3Queue.length===0&&stats.outfits===0)
+    sub='Nothing left to curate — add new items to your wardrobe to start again.';
+  document.getElementById('done-sub').textContent=sub;
+  showScreen('screen-done');
+}
+
+init();
+</script>
+</body>
+</html>
