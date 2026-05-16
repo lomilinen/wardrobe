@@ -50,8 +50,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
 .wear-btn:hover{opacity:.8;}
 
 /* FLAT-LAY OUTFIT GRID */
-.flatlay{display:grid;grid-template-rows:1fr 1fr;width:100%;border-radius:var(--rsm);overflow:hidden;background:var(--cream);}
-.flatlay-cell{overflow:hidden;display:flex;align-items:center;justify-content:center;background:var(--cream);border:1px solid var(--border);font-size:22px;position:relative;min-height:80px;}
+.flatlay{display:grid;grid-template-rows:auto auto;width:100%;border-radius:var(--rsm);overflow:hidden;background:var(--cream);}
+.flatlay-cell{overflow:hidden;display:flex;align-items:center;justify-content:center;background:var(--cream);border:1px solid var(--border);font-size:22px;position:relative;aspect-ratio:1/1;}
 .flatlay-cell img{width:100%;height:100%;object-fit:contain;}
 .flatlay-more{position:absolute;inset:0;background:rgba(26,23,20,.55);display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:500;}
 .flatlay-sm .flatlay-cell{min-height:16px;font-size:8px;}
@@ -396,7 +396,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
 <div class="detail-screen" id="outfit-detail-screen">
   <button class="detail-back" onclick="closeOutfitDetail()">&#8592; Back</button>
   <div class="detail-title" id="outfit-detail-title">Outfit</div>
-  <div style="margin-bottom:1.25rem;max-width:260px;max-height:280px;overflow:hidden;" id="outfit-detail-flatlay"></div>
+  <div style="margin-bottom:1.25rem;max-width:280px;" id="outfit-detail-flatlay"></div>
   <div id="outfit-detail-acc-summary" style="margin-bottom:1rem;"></div>
   <div class="detail-actions">
     <button class="btn-danger" onclick="deleteOutfitFromDetail()">Delete</button>
