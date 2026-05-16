@@ -866,7 +866,7 @@ function buildFlatlay(outfitId,sm=false){
   cols.forEach((col,ci)=>{
     const colNum=ci+1;
     if(col.span){
-      const ar=dressOnly?'aspect-ratio:3/4':'aspect-ratio:1/2';
+      const ar=dressOnly?'aspect-ratio:3/4':'aspect-ratio:3/5';
       cellsHtml+=`<div class="flatlay-cell" style="grid-column:${colNum};grid-row:${dressOnly?'1':'1/3'};${ar};">${renderCellInner(col.items[0],false)}</div>`;
     } else {
       const showMore=col.accOverflow>0;
