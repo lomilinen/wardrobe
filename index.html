@@ -870,8 +870,12 @@ function buildFlatlay(outfitId,sm=false){
       cellsHtml+=`<div class="flatlay-cell" style="grid-column:${colNum};grid-row:${dressOnly?'1':'1/3'};${ar};">${renderCellInner(col.items[0],false)}</div>`;
     } else {
       const showMore=col.accOverflow>0;
-      cellsHtml+=`<div class="flatlay-cell" style="grid-column:${colNum};grid-row:1;aspect-ratio:1/1;">${renderCellInner(col.items[0],false)}</div>`;
-      cellsHtml+=`<div class="flatlay-cell" style="grid-column:${colNum};grid-row:2;aspect-ratio:2/3;">${renderCellInner(col.items[1],showMore,col.accOverflow)}</div>`;
+      if(col.items[1]){
+        cellsHtml+=`<div class="flatlay-cell" style="grid-column:${colNum};grid-row:1;aspect-ratio:1/1;">${renderCellInner(col.items[0],false)}</div>`;
+        cellsHtml+=`<div class="flatlay-cell" style="grid-column:${colNum};grid-row:2;aspect-ratio:2/3;">${renderCellInner(col.items[1],showMore,col.accOverflow)}</div>`;
+      } else {
+        cellsHtml+=`<div class="flatlay-cell" style="grid-column:${colNum};grid-row:1/3;aspect-ratio:1/1;">${renderCellInner(col.items[0],false)}</div>`;
+      }
     }
   });
   const rows=dressOnly?'auto':'auto auto';
@@ -915,8 +919,12 @@ function buildFlatlayCore(outfitId){
       const ar=dressOnly?'aspect-ratio:3/4':'aspect-ratio:1/2';
       cellsHtml+=`<div class="flatlay-cell" style="grid-column:${colNum};grid-row:${dressOnly?'1':'1/3'};${ar};">${renderCellInner(col.items[0],false)}</div>`;
     } else {
-      cellsHtml+=`<div class="flatlay-cell" style="grid-column:${colNum};grid-row:1;aspect-ratio:1/1;">${renderCellInner(col.items[0],false)}</div>`;
-      cellsHtml+=`<div class="flatlay-cell" style="grid-column:${colNum};grid-row:2;aspect-ratio:2/3;">${renderCellInner(col.items[1],false)}</div>`;
+      if(col.items[1]){
+        cellsHtml+=`<div class="flatlay-cell" style="grid-column:${colNum};grid-row:1;aspect-ratio:1/1;">${renderCellInner(col.items[0],false)}</div>`;
+        cellsHtml+=`<div class="flatlay-cell" style="grid-column:${colNum};grid-row:2;aspect-ratio:2/3;">${renderCellInner(col.items[1],false)}</div>`;
+      } else {
+        cellsHtml+=`<div class="flatlay-cell" style="grid-column:${colNum};grid-row:1/3;aspect-ratio:1/1;">${renderCellInner(col.items[0],false)}</div>`;
+      }
     }
   });
   const rows=dressOnly?'auto':'auto auto';
