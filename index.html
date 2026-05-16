@@ -135,6 +135,19 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
 .icard{background:var(--warm);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;cursor:pointer;transition:border-color .15s,transform .1s;}
 .icard.icard-unavailable{opacity:.35;}
 .icard.icard-unavailable .iimg{filter:grayscale(.6);}
+.icard.icard-occasion{opacity:.55;}
+.icard-wrap{position:relative;display:contents;}
+.icard.icard-selected{border-color:var(--sage);box-shadow:0 0 0 2px var(--sage);}
+.icard-check{position:absolute;top:4px;left:4px;width:18px;height:18px;border-radius:50%;border:2px solid var(--border-mid);background:var(--warm);z-index:2;pointer-events:none;}
+.icard-check.checked{background:var(--sage);border-color:var(--sage);}
+.icard-check.checked::after{content:'✓';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:10px;color:#fff;line-height:1;}
+.wardrobe-select-bar{display:none;position:fixed;bottom:70px;left:0;right:0;z-index:80;padding:10px 16px;background:var(--ink);gap:8px;align-items:center;}
+.wardrobe-select-bar.open{display:flex;}
+.wsbar-btn{flex:1;padding:10px;border-radius:var(--rsm);border:none;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;}
+.wsbar-unavail{background:var(--cream);color:var(--ink);}
+.wsbar-avail{background:var(--sage);color:#fff;}
+.wsbar-cancel{background:transparent;color:var(--warm);border:1px solid rgba(255,255,255,.3);flex:0 0 auto;padding:10px 14px;}
+.outfit-card.outfit-card-dimmed{opacity:.4;}
 .iimg{width:100%;aspect-ratio:1;background:var(--cream);display:flex;align-items:center;justify-content:center;font-size:38px;overflow:hidden;}
 .iimg img{width:100%;height:100%;object-fit:contain;}
 .imeta{padding:6px 8px;}
@@ -290,8 +303,14 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
         <option value="unavailable">🚫 Unavailable</option>
       </select>
       <button class="addbtn" onclick="openAddModal()">+ Add</button>
+      <button class="btn-outline" id="wardrobe-select-btn" onclick="toggleWardrobeSelectMode()" style="font-size:12px;padding:7px 12px;white-space:nowrap;">Select</button>
     </div>
     <div id="items-grid"></div>
+  </div>
+  <div class="wardrobe-select-bar" id="wardrobe-select-bar">
+    <button class="wsbar-btn wsbar-unavail" onclick="bulkSetUnavailable(true)">🚫 Mark unavailable</button>
+    <button class="wsbar-btn wsbar-avail" onclick="bulkSetUnavailable(false)">✓ Mark available</button>
+    <button class="wsbar-btn wsbar-cancel" onclick="exitWardrobeSelectMode()">Cancel</button>
   </div>
 
   <!-- OUTFITS -->
@@ -417,13 +436,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
     <div id="worn-count-section" style="display:none;">
       <div class="worn-count-badge" id="worn-count-badge">👕 Worn 0 times</div>
     </div>
-    <div class="fgroup" id="occasion-section" style="display:none;">
-      <label class="flabel">Type</label>
-      <div class="tag-row">
-        <button class="wtag" id="occasion-tog" onclick="this.classList.toggle('active')">🎉 Occasion item</button>
-      </div>
-      <div class="fhint">Occasion items won't appear in daily suggestions.</div>
-    </div>
     <div class="fgroup" id="unavailable-section" style="display:none;">
       <label class="flabel">Availability</label>
       <div class="tag-row">
@@ -453,6 +465,13 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
         <option value="scarves">Scarf / Tights</option>
         <option value="accessories">Accessories</option>
       </select>
+    </div>
+    <div class="fgroup" id="occasion-section" style="display:none;">
+      <label class="flabel">Type</label>
+      <div class="tag-row">
+        <button class="wtag" id="occasion-tog" onclick="this.classList.toggle('active')">🎉 Occasion item</button>
+      </div>
+      <div class="fhint">Occasion items won't appear in daily suggestions.</div>
     </div>
     <div class="fgroup" id="item-weather-tags">
       <label class="flabel">When to wear this</label>
@@ -540,6 +559,7 @@ let currentOutfitDetailId=null,outfitDetailReturnTo=null;
 let pairedPage_current=0,pairedMarkedForRemoval=new Set();
 let savingTimer=null;
 let editAccOutfitId=null,editAccState={};
+let wardrobeSelectMode=false,wardrobeSelected=new Set();
 
 // ===== API =====
 async function apiCall(params){
@@ -606,23 +626,46 @@ function previewImg(val){
 }
 
 // ===== INIT =====
+const CACHE_KEY='wardrobe_cache_v1';
+const CACHE_TTL=60*60*1000; // 1 hour
+
+function saveCache(){
+  try{localStorage.setItem(CACHE_KEY,JSON.stringify({ts:Date.now(),items,outfits,wornLogs}));}catch(e){}
+}
+function loadCache(){
+  try{
+    const raw=localStorage.getItem(CACHE_KEY);
+    if(!raw)return false;
+    const {ts,items:ci,outfits:co,wornLogs:cl}=JSON.parse(raw);
+    if(Date.now()-ts>CACHE_TTL)return false;
+    items=Array.isArray(ci)?ci.map(normalizeItem):[];
+    outfits=Array.isArray(co)?co.map(normalizeOutfit):[];
+    wornLogs=Array.isArray(cl)?cl:[];
+    return true;
+  }catch(e){return false;}
+}
+
 async function init(){
   const today=new Date();
   calYear=today.getFullYear();calMonth=today.getMonth();
   buildCatFilterBtns();
-  await loadWeather();
-  // Priority: load items + logs first so calendar renders immediately
-  const [ir,lr]=await Promise.all([
+
+  // Render from cache immediately if available
+  const hadCache=loadCache();
+  if(hadCache){renderCalendar();renderWardrobe();}
+
+  // Fire all fetches in parallel
+  const [ir,lr,or]=await Promise.all([
     apiCall({action:'getItems'}),
-    apiCall({action:'getLogs'})
+    apiCall({action:'getLogs'}),
+    apiCall({action:'getOutfits'}),
+    loadWeather()
   ]);
   items=Array.isArray(ir)?ir.map(normalizeItem):[];
   wornLogs=Array.isArray(lr)?lr:[];
-  renderCalendar();
-  // Then load outfits in background
-  const or=await apiCall({action:'getOutfits'});
   outfits=Array.isArray(or)?or.map(normalizeOutfit):[];
-  renderCalendar(); // re-render with outfit thumbnails
+  saveCache();
+  renderCalendar();
   renderWardrobe();
 }
 
@@ -928,7 +971,7 @@ function renderOutfits(){
   outfitsFiltered=outfits.filter(o=>o.id!=='__preview__');
   if(tempFilter)outfitsFiltered=outfitsFiltered.filter(o=>outfitMatchesTempFilter(o,tempFilter));
   if(typeFilter==='occasion')outfitsFiltered=outfitsFiltered.filter(o=>isOccasionOutfit(o));
-  if(typeFilter==='everyday')outfitsFiltered=outfitsFiltered.filter(o=>!isOccasionOutfit(o));
+  if(typeFilter==='everyday')outfitsFiltered=outfitsFiltered.filter(o=>!isOccasionOutfit(o)&&!isUnavailableOutfit(o));
   if(typeFilter==='unavailable')outfitsFiltered=outfitsFiltered.filter(o=>isUnavailableOutfit(o));
   outfitsFiltered.sort((a,b)=>sort==='most'?score(a)-score(b):score(b)-score(a));
   renderOutfitsPage();
@@ -947,14 +990,18 @@ function renderOutfitsPage(){
 
   list.innerHTML=page.map(o=>{
     const isOcc=isOccasionOutfit(o);
+    const isUnavail=isUnavailableOutfit(o);
+    const typeFilter=document.getElementById('outfits-type')?.value||'';
+    const dimmed=!typeFilter&&(isOcc||isUnavail);
     const dUnworn=daysSince(o.lastWorn);
     const isSelected=outfitSelected.has(o.id);
-    return`<div class="outfit-card${isSelected?' outfit-card-selected':''}" onclick="${outfitSelectMode?`toggleOutfitSelect('${o.id}')`:`openOutfitDetail('${o.id}','outfits')`}">
+    return`<div class="outfit-card${isSelected?' outfit-card-selected':''}${dimmed?' outfit-card-dimmed':''}" onclick="${outfitSelectMode?`toggleOutfitSelect('${o.id}')`:`openOutfitDetail('${o.id}','outfits')`}">
       ${outfitSelectMode?`<div style="position:absolute;top:5px;left:5px;width:18px;height:18px;border-radius:50%;background:${isSelected?'var(--sage)':'var(--warm)'};border:2px solid ${isSelected?'var(--sage)':'var(--border-mid)'};z-index:2;"></div>`:''}
       ${buildFlatlayCore(o.id)}
       <div class="outfit-card-foot">
         <div class="outfit-card-badges">
           ${isOcc?'<span class="sbadge badge-old">🎉 Occasion</span>':''}
+          ${isUnavail&&!isOcc?'<span class="sbadge badge-old">🚫 Unavailable</span>':''}
           <span class="sbadge ${dUnworn>=14?'badge-old':'badge-ok'}">${dUnworn>=14?`⏳ ${dUnworn}d unworn`:'✓ Good rotation'}</span>
         </div>
       </div>
@@ -1136,6 +1183,10 @@ function toggleEditAccSection(id,titleEl){
   if(!isOpen){body.classList.add('open');arrow.textContent='▾';}
 }
 
+function closeEditAcc(){
+  document.getElementById('edit-acc-screen').classList.remove('open');
+}
+
 function toggleEditAcc(cat,itemId){
   const idx=(editAccState[cat]||[]).indexOf(itemId);
   if(idx>-1)editAccState[cat].splice(idx,1);
@@ -1146,37 +1197,41 @@ function toggleEditAcc(cat,itemId){
 
 async function saveEditAcc(){
   const o=outfits.find(x=>x.id===editAccOutfitId);
-  if(!o)return;
+  if(!o){closeEditAcc();return;}
   ACC_CATS.forEach(cat=>{o.accByCat[cat]=editAccState[cat]||[];});
   o.accessories=Object.values(o.accByCat).flat();
-  document.getElementById('outfit-detail-flatlay').innerHTML=buildFlatlayCore(editAccOutfitId);
-  // Re-render acc summary in detail
-  const accSummary=document.getElementById('outfit-detail-acc-summary');
-  accSummary.innerHTML='';
-  let hasAnyAcc=false;
-  ACC_CATS.forEach(cat=>{
-    const linked=(o.accByCat[cat]||[]).map(id=>getItem(id)).filter(Boolean);
-    if(!linked.length)return;
-    hasAnyAcc=true;
-    const div=document.createElement('div');
-    div.style.marginBottom='14px';
-    div.innerHTML=`<div class="sec-label" style="margin-bottom:8px;">${CATS[cat].label}</div>
-      <div class="acc-options">
-        ${linked.map(a=>`
-          <div class="acc-option" id="dopt-${a.id}" onclick="toggleDetailAcc('${a.id}')">
-            <div class="acc-option-thumb">${a.img?`<img src="${a.img}" loading="lazy">`:`<span>${a.emoji||'💍'}</span>`}</div>
-          </div>`).join('')}
-      </div>`;
-    accSummary.appendChild(div);
-  });
-  if(hasAnyAcc){
-    const hint=document.createElement('div');
-    hint.style.cssText='font-size:11px;color:var(--ink-faint);margin-bottom:1rem;';
-    hint.textContent='Tap accessories to select what you\'re wearing today.';
-    accSummary.insertBefore(hint,accSummary.firstChild);
-  }
   closeEditAcc();
   showSaving();
+  try{
+    const flatlay=document.getElementById('outfit-detail-flatlay');
+    if(flatlay)flatlay.innerHTML=buildFlatlayCore(editAccOutfitId);
+    const accSummary=document.getElementById('outfit-detail-acc-summary');
+    if(accSummary){
+      accSummary.innerHTML='';
+      let hasAnyAcc=false;
+      ACC_CATS.forEach(cat=>{
+        const linked=(o.accByCat[cat]||[]).map(id=>getItem(id)).filter(Boolean);
+        if(!linked.length)return;
+        hasAnyAcc=true;
+        const div=document.createElement('div');
+        div.style.marginBottom='14px';
+        div.innerHTML=`<div class="sec-label" style="margin-bottom:8px;">${CATS[cat].label}</div>
+          <div class="acc-options">
+            ${linked.map(a=>`
+              <div class="acc-option" id="dopt-${a.id}" onclick="toggleDetailAcc('${a.id}')">
+                <div class="acc-option-thumb">${a.img?`<img src="${a.img}" loading="lazy">`:`<span>${a.emoji||'💍'}</span>`}</div>
+              </div>`).join('')}
+          </div>`;
+        accSummary.appendChild(div);
+      });
+      if(hasAnyAcc){
+        const hint=document.createElement('div');
+        hint.style.cssText='font-size:11px;color:var(--ink-faint);margin-bottom:1rem;';
+        hint.textContent='Tap accessories to select what you\'re wearing today.';
+        accSummary.insertBefore(hint,accSummary.firstChild);
+      }
+    }
+  }catch(e){console.warn('saveEditAcc DOM error:',e);}
   await apiCall({action:'updateOutfit',data:{...o,accByCat:JSON.stringify(o.accByCat)}});
   showToast('Accessories saved');
 }
@@ -1319,12 +1374,14 @@ function renderWardrobe(){
   const isFiltered=currentCat!=='all';
   let html='';let totalFound=0;
 
+  // When no typeFilter: show all items, but occasion/unavailable are visually dimmed
+  // When typeFilter set: hard filter — everyday hides both occasion AND unavailable
   function applyFilters(arr){
     return arr.filter(i=>{
       if(tempFilter&&!((i.seasons||[]).includes(tempFilter)))return false;
       if(rainFilter==='rainy'&&RAINY_TAG_CATS.includes(i.cat)&&!(i.conditions||[]).includes('rainy'))return false;
       if(typeFilter==='occasion'&&!i.occasion)return false;
-      if(typeFilter==='everyday'&&i.occasion)return false;
+      if(typeFilter==='everyday'&&(i.occasion||i.unavailable))return false;
       if(typeFilter==='unavailable'&&!i.unavailable)return false;
       return true;
     });
@@ -1355,14 +1412,57 @@ function renderWardrobe(){
   grid.innerHTML=html;
 }
 
-// ITEM 6: 4 per row — done via CSS (.items-grid uses repeat(4,1fr))
 function itemCard(item){
-  return`<div class="icard${item.unavailable?' icard-unavailable':''}" onclick="openEditModal('${item.id}')">
+  const dimmed=item.unavailable||item.occasion;
+  const selected=wardrobeSelected.has(item.id);
+  const clickFn=wardrobeSelectMode?`toggleWardrobeSelect('${item.id}')`:`openEditModal('${item.id}')`;
+  const check=wardrobeSelectMode?`<div class="icard-check${selected?' checked':''}"></div>`:'';
+  return`<div class="icard${item.unavailable?' icard-unavailable':item.occasion?' icard-occasion':''}${selected?' icard-selected':''}" style="position:relative;" onclick="${clickFn}">
+    ${check}
     <div class="iimg">${item.img?`<img src="${item.img}" loading="lazy">`:`<span>${item.emoji||CATS[item.cat]?.emoji||'👕'}</span>`}</div>
     <div class="imeta">
       <div class="iworn">${item.unavailable?'🚫 ':item.occasion?'🎉 ':''} ${item.wornCount||0}× · ${daysSince(item.lastWorn)}d ago</div>
     </div>
   </div>`;
+}
+
+function toggleWardrobeSelectMode(){
+  wardrobeSelectMode=true;
+  wardrobeSelected=new Set();
+  document.getElementById('wardrobe-select-bar').classList.add('open');
+  document.getElementById('wardrobe-select-btn').style.display='none';
+  renderWardrobe();
+}
+
+function exitWardrobeSelectMode(){
+  wardrobeSelectMode=false;
+  wardrobeSelected=new Set();
+  document.getElementById('wardrobe-select-bar').classList.remove('open');
+  document.getElementById('wardrobe-select-btn').style.display='';
+  renderWardrobe();
+}
+
+function toggleWardrobeSelect(id){
+  if(wardrobeSelected.has(id))wardrobeSelected.delete(id);
+  else wardrobeSelected.add(id);
+  renderWardrobe();
+}
+
+async function bulkSetUnavailable(makeUnavailable){
+  if(!wardrobeSelected.size){showToast('No items selected');return;}
+  const ids=[...wardrobeSelected];
+  ids.forEach(id=>{
+    const item=items.find(i=>i.id===id);
+    if(item)item.unavailable=makeUnavailable;
+  });
+  exitWardrobeSelectMode();
+  saveCache();
+  showSaving();
+  await Promise.all(ids.map(id=>{
+    const item=items.find(i=>i.id===id);
+    return item?apiCall({action:'updateItem',data:item}):Promise.resolve();
+  }));
+  showToast(makeUnavailable?`${ids.length} item${ids.length>1?'s':''} marked unavailable`:`${ids.length} item${ids.length>1?'s':''} marked available`);
 }
 
 function toggleWardrobeSection(id,titleEl){
@@ -1414,10 +1514,9 @@ function openAddModal(){
   document.getElementById('icat').value='tops';
   document.getElementById('modal-del-btn').style.display='none';
   document.getElementById('worn-count-section').style.display='none';
-  document.getElementById('occasion-section').style.display='none';
-  document.getElementById('occasion-tog').classList.remove('active');
   document.getElementById('unavailable-section').style.display='none';
   document.getElementById('unavailable-tog').classList.remove('active');
+  document.getElementById('occasion-tog').classList.remove('active');
   document.querySelectorAll('[data-itag]').forEach(b=>b.classList.remove('active'));
   document.getElementById('paired-outfits-section').style.display='none';
   onCatChange('tops');
@@ -1584,6 +1683,8 @@ function onCatChange(cat){
   weatherSec.style.display=(showSeason||showRainy)?'block':'none';
   seasonGrp.style.display=showSeason?'block':'none';
   condGrp.style.display=showRainy?'block':'none';
+  const occSec=document.getElementById('occasion-section');
+  if(occSec)occSec.style.display=OCCASION_CATS.includes(cat)?'block':'none';
 }
 
 async function saveItemModal(){
@@ -2009,8 +2110,11 @@ function getVariedSuggestions(pool,max){
   // Helper: get dominant core type of an outfit
   function dominantType(o){
     const ps=(o.pieces||[]).map(getItem).filter(Boolean);
-    if(ps.some(p=>p.cat==='dresses'))return'dress';
-    if(ps.every(p=>p.cat==='bottoms'||p.cat==='jumpers'))return'bottoms';
+    const hasDress=ps.some(p=>p.cat==='dresses');
+    const hasTop=ps.some(p=>p.cat==='tops');
+    const hasBottom=ps.some(p=>p.cat==='bottoms');
+    if(hasDress&&!hasTop&&!hasBottom)return'dress';
+    if(hasBottom&&!hasTop&&!hasDress)return'bottoms';
     return'other';
   }
 
