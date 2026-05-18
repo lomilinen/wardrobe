@@ -1113,7 +1113,9 @@ function confirmWornFromDetail(){
   const logDate=document.getElementById('detail-date-input').value||todayStr();
   document.getElementById('date-pick-screen').classList.remove('open');
   document.getElementById('outfit-detail-screen').style.visibility='';
-  // Log with all linked accessories (none individually selected — full acc list)
+  closeOutfitDetail();
+  const calBtn=document.querySelector('.tab[onclick*="calendar"]');
+  switchTab('calendar', calBtn);
   const allAccs=Object.values(o.accByCat||{}).flat();
   logOutfit(o, allAccs, logDate);
 }
