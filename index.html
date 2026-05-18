@@ -113,6 +113,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
 .acc-cat-title{font-size:12px;font-weight:500;color:var(--ink-soft);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em;}
 .acc-options{display:flex;gap:8px;flex-wrap:wrap;}
 .acc-option{display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;}
+.acc-option-weather-na{opacity:.35;}
 .acc-option-thumb{width:60px;height:60px;border-radius:var(--rsm);background:var(--warm);border:2px solid var(--border);overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:24px;transition:border-color .15s;}
 .acc-option-thumb img{width:100%;height:100%;object-fit:contain;}
 .acc-option.selected .acc-option-thumb{border-color:var(--sage);}
@@ -1107,10 +1108,14 @@ function closeDatePickScreen(){
 
 function confirmWornFromDetail(){
   const oid=document.getElementById('date-pick-screen').dataset.outfitId||currentOutfitDetailId;
+  const o=outfits.find(x=>x.id===oid);
+  if(!o)return;
   const logDate=document.getElementById('detail-date-input').value||todayStr();
   document.getElementById('date-pick-screen').classList.remove('open');
   document.getElementById('outfit-detail-screen').style.visibility='';
-  openWearing(oid, logDate);
+  // Log with all linked accessories (none individually selected — full acc list)
+  const allAccs=Object.values(o.accByCat||{}).flat();
+  logOutfit(o, allAccs, logDate);
 }
 
 // ===== ITEM 5: Edit Accessories — accordion per category + item 4 season greying =====
@@ -1303,21 +1308,43 @@ function openWearing(outfitId,dateOverride){
   const sections=document.getElementById('wearing-acc-sections');
   sections.innerHTML='';
   ACC_CATS.forEach(cat=>{
-    const linked=(accByCat[cat]||[]).map(id=>getItem(id)).filter(Boolean)
-      .filter(a=>accWeatherOk(a,weather.tempC,weather.condition));
+    const linked=(accByCat[cat]||[]).map(id=>getItem(id)).filter(Boolean);
     if(!linked.length)return;
     const sec=document.createElement('div');
     sec.className='acc-cat-section';
-    // ITEM 2: no label under each thumb
     sec.innerHTML=`<div class="acc-cat-title">${CATS[cat].label}</div>
       <div class="acc-options" id="acc-opts-${cat}">
-        ${linked.map(a=>`<div class="acc-option" id="aopt-${a.id}" onclick="selectAcc('${cat}','${a.id}')">
-          <div class="acc-option-thumb">${a.img?`<img src="${a.img}" loading="lazy">`:`<span>${a.emoji||'💍'}</span>`}</div>
-        </div>`).join('')}
+        ${linked.map(a=>{
+          const weatherBad=!accWeatherOk(a,weather.tempC,weather.condition);
+          return`<div class="acc-option${weatherBad?' acc-option-weather-na':''}" id="aopt-${a.id}" onclick="selectAcc('${cat}','${a.id}')">
+            <div class="acc-option-thumb">${a.img?`<img src="${a.img}" loading="lazy">`:`<span>${a.emoji||'💍'}</span>`}</div>
+          </div>`;
+        }).join('')}
       </div>`;
     sections.appendChild(sec);
   });
   document.getElementById('wearing-screen').classList.add('open');
+}
+
+async function logOutfit(o, chosenAccs, logDate){
+  const log={
+    id:'l'+Date.now(),date:logDate||todayStr(),
+    outfitId:o.id,outfitNum:o.num,
+    pieces:o.pieces,accessories:chosenAccs,
+    tempC:weather.tempC,condition:weather.condition,weatherLabel:weather.label
+  };
+  o.lastWorn=new Date().toISOString();
+  const allWorn=[...o.pieces,...chosenAccs];
+  allWorn.forEach(pid=>{const it=getItem(pid);if(it){it.lastWorn=new Date().toISOString();it.wornCount=(it.wornCount||0)+1;}});
+  wornLogs.push(log);
+  renderCalendar();
+  showSaving();
+  await Promise.all([
+    apiCall({action:'updateOutfit',data:{...o,accByCat:JSON.stringify(o.accByCat)}}),
+    apiCall({action:'saveLog',data:log}),
+    ...allWorn.map(pid=>{const it=getItem(pid);return it?apiCall({action:'updateItem',data:it}):Promise.resolve();})
+  ]);
+  showToast('Outfit logged!');
 }
 
 function selectAcc(cat,id){
@@ -1341,7 +1368,6 @@ async function confirmWorn(){
   const logDate=document.getElementById('wearing-date-input').value||todayStr();
 
   if(editingLogId){
-    // Editing an existing log entry — just update accessories
     const log=wornLogs.find(l=>l.id===editingLogId);
     if(log){
       log.accessories=chosenAccs;
@@ -1355,26 +1381,8 @@ async function confirmWorn(){
     return;
   }
 
-  // New log entry
-  const log={
-    id:'l'+Date.now(),date:logDate,
-    outfitId:o.id,outfitNum:o.num,
-    pieces:o.pieces,accessories:chosenAccs,
-    tempC:weather.tempC,condition:weather.condition,weatherLabel:weather.label
-  };
-  o.lastWorn=new Date().toISOString();
-  const allWorn=[...o.pieces,...chosenAccs];
-  allWorn.forEach(pid=>{const it=getItem(pid);if(it){it.lastWorn=new Date().toISOString();it.wornCount=(it.wornCount||0)+1;}});
-  wornLogs.push(log);
   closeWearing();
-  renderCalendar();
-  showSaving();
-  await Promise.all([
-    apiCall({action:'updateOutfit',data:{...o,accByCat:JSON.stringify(o.accByCat)}}),
-    apiCall({action:'saveLog',data:log}),
-    ...allWorn.map(pid=>{const it=getItem(pid);return it?apiCall({action:'updateItem',data:it}):Promise.resolve();})
-  ]);
-  showToast('Outfit logged!');
+  await logOutfit(o, chosenAccs, logDate);
 }
 
 function closeWearing(){
