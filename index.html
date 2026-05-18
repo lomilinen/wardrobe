@@ -866,16 +866,12 @@ function buildFlatlay(outfitId,sm=false){
   cols.forEach((col,ci)=>{
     const colNum=ci+1;
     if(col.span){
-      const ar=dressOnly?'aspect-ratio:3/4':'aspect-ratio:3/5';
+      const ar=dressOnly?'aspect-ratio:3/4':'';
       cellsHtml+=`<div class="flatlay-cell" style="grid-column:${colNum};grid-row:${dressOnly?'1':'1/3'};${ar};">${renderCellInner(col.items[0],false)}</div>`;
     } else {
       const showMore=col.accOverflow>0;
-      if(col.items[1]){
-        cellsHtml+=`<div class="flatlay-cell" style="grid-column:${colNum};grid-row:1;aspect-ratio:1/1;">${renderCellInner(col.items[0],false)}</div>`;
-        cellsHtml+=`<div class="flatlay-cell" style="grid-column:${colNum};grid-row:2;aspect-ratio:2/3;">${renderCellInner(col.items[1],showMore,col.accOverflow)}</div>`;
-      } else {
-        cellsHtml+=`<div class="flatlay-cell" style="grid-column:${colNum};grid-row:1/3;aspect-ratio:1/1;">${renderCellInner(col.items[0],false)}</div>`;
-      }
+      cellsHtml+=`<div class="flatlay-cell" style="grid-column:${colNum};grid-row:1;aspect-ratio:1/1;">${renderCellInner(col.items[0],false)}</div>`;
+      cellsHtml+=`<div class="flatlay-cell" style="grid-column:${colNum};grid-row:2;aspect-ratio:2/3;">${renderCellInner(col.items[1],showMore,col.accOverflow)}</div>`;
     }
   });
   const rows=dressOnly?'auto':'auto auto';
@@ -916,15 +912,11 @@ function buildFlatlayCore(outfitId){
   cols.forEach((col,ci)=>{
     const colNum=ci+1;
     if(col.span){
-      const ar=dressOnly?'aspect-ratio:3/4':'aspect-ratio:1/2';
+      const ar=dressOnly?'aspect-ratio:3/4':'';
       cellsHtml+=`<div class="flatlay-cell" style="grid-column:${colNum};grid-row:${dressOnly?'1':'1/3'};${ar};">${renderCellInner(col.items[0],false)}</div>`;
     } else {
-      if(col.items[1]){
-        cellsHtml+=`<div class="flatlay-cell" style="grid-column:${colNum};grid-row:1;aspect-ratio:1/1;">${renderCellInner(col.items[0],false)}</div>`;
-        cellsHtml+=`<div class="flatlay-cell" style="grid-column:${colNum};grid-row:2;aspect-ratio:2/3;">${renderCellInner(col.items[1],false)}</div>`;
-      } else {
-        cellsHtml+=`<div class="flatlay-cell" style="grid-column:${colNum};grid-row:1/3;aspect-ratio:1/1;">${renderCellInner(col.items[0],false)}</div>`;
-      }
+      cellsHtml+=`<div class="flatlay-cell" style="grid-column:${colNum};grid-row:1;aspect-ratio:1/1;">${renderCellInner(col.items[0],false)}</div>`;
+      cellsHtml+=`<div class="flatlay-cell" style="grid-column:${colNum};grid-row:2;aspect-ratio:2/3;">${renderCellInner(col.items[1],false)}</div>`;
     }
   });
   const rows=dressOnly?'auto':'auto auto';
@@ -1006,7 +998,7 @@ function renderOutfitsPage(){
     const isUnavail=isUnavailableOutfit(o);
     const typeFilter=document.getElementById('outfits-type')?.value||'';
     const dimmed=!typeFilter&&(isOcc||isUnavail);
-    const dUnworn=daysSince(o.lastWorn);
+    const dUnworn=o.lastWorn?daysSince(o.lastWorn):null;
     const isSelected=outfitSelected.has(o.id);
     return`<div class="outfit-card${isSelected?' outfit-card-selected':''}${dimmed?' outfit-card-dimmed':''}" onclick="${outfitSelectMode?`toggleOutfitSelect('${o.id}')`:`openOutfitDetail('${o.id}','outfits')`}">
       ${outfitSelectMode?`<div style="position:absolute;top:5px;left:5px;width:18px;height:18px;border-radius:50%;background:${isSelected?'var(--sage)':'var(--warm)'};border:2px solid ${isSelected?'var(--sage)':'var(--border-mid)'};z-index:2;"></div>`:''}
@@ -1015,7 +1007,7 @@ function renderOutfitsPage(){
         <div class="outfit-card-badges">
           ${isOcc?'<span class="sbadge badge-old">🎉 Occasion</span>':''}
           ${isUnavail&&!isOcc?'<span class="sbadge badge-old">🚫 Unavailable</span>':''}
-          <span class="sbadge ${dUnworn>=14?'badge-old':'badge-ok'}">${dUnworn>=14?`⏳ ${dUnworn}d unworn`:'✓ Good rotation'}</span>
+          <span class="sbadge ${dUnworn===null?'badge-old':dUnworn>=14?'badge-old':'badge-ok'}">${dUnworn===null?'⏳ Never worn':dUnworn>=14?`⏳ ${dUnworn}d unworn`:'✓ Good rotation'}</span>
         </div>
       </div>
     </div>`;
@@ -1089,11 +1081,8 @@ function closeOutfitDetail(){
 
 function wearOutfitFromDetail(){
   if(!currentOutfitDetailId)return;
-  document.getElementById('date-pick-screen').dataset.outfitId=currentOutfitDetailId;
-  const dateInput=document.getElementById('detail-date-input');
-  dateInput.value=todayStr();
-  dateInput.max=todayStr();
-  document.getElementById('date-pick-screen').classList.add('open');
+  closeOutfitDetail();
+  openWearing(currentOutfitDetailId);
 }
 
 function openEditAccFromDatePick(){
@@ -1257,10 +1246,20 @@ async function saveEditAcc(){
 let editingLogId=null;
 
 function editLogAccFromSheet(logId,outfitId){
+  const log=wornLogs.find(l=>l.id===logId);
+  const o=outfits.find(x=>x.id===outfitId);
+  if(!log||!o)return;
   editingLogId=logId;
   closeDayDetail();
-  currentOutfitDetailId=outfitId;
-  openEditAccFromDetail();
+  // Open wearing screen with the log date locked and log's chosen accs pre-selected
+  openWearing(outfitId,log.date);
+  // Pre-select the accessories that were logged
+  setTimeout(()=>{
+    (log.accessories||[]).forEach(id=>{
+      const el=document.getElementById(`aopt-${id}`);
+      if(el)el.classList.add('selected');
+    });
+  },50);
 }
 
 async function saveEditAccForLog(){
@@ -1294,7 +1293,7 @@ async function deleteOutfitFromDetail(){
   const id=currentOutfitDetailId;
   outfits=outfits.filter(o=>o.id!==id);
   closeOutfitDetail();
-  renderOutfits();
+  renderOutfitsPage();
   showSaving();
   await apiCall({action:'deleteOutfit',id});
   showToast('Outfit deleted');
@@ -1357,6 +1356,23 @@ async function confirmWorn(){
     if(!confirm('No accessories selected — log this outfit without any?'))return;
   }
   const logDate=document.getElementById('wearing-date-input').value||todayStr();
+
+  if(editingLogId){
+    // Editing an existing log entry — just update accessories
+    const log=wornLogs.find(l=>l.id===editingLogId);
+    if(log){
+      log.accessories=chosenAccs;
+      editingLogId=null;
+      closeWearing();
+      renderCalendar();
+      showSaving();
+      await apiCall({action:'updateLog',data:log});
+      showToast('Accessories updated');
+    }
+    return;
+  }
+
+  // New log entry
   const log={
     id:'l'+Date.now(),date:logDate,
     outfitId:o.id,outfitNum:o.num,
@@ -1381,6 +1397,7 @@ async function confirmWorn(){
 function closeWearing(){
   document.getElementById('wearing-screen').classList.remove('open');
   wearingOutfitId=null;
+  editingLogId=null;
 }
 
 // ===== WARDROBE =====
@@ -1439,7 +1456,7 @@ function itemCard(item){
     ${check}
     <div class="iimg">${item.img?`<img src="${item.img}" loading="lazy">`:`<span>${item.emoji||CATS[item.cat]?.emoji||'👕'}</span>`}</div>
     <div class="imeta">
-      <div class="iworn">${item.unavailable?'🚫 ':item.occasion?'🎉 ':''} ${item.wornCount||0}× · ${daysSince(item.lastWorn)}d ago</div>
+      <div class="iworn">${item.unavailable?'🚫 ':item.occasion?'🎉 ':''} ${item.wornCount||0}× · ${item.lastWorn?daysSince(item.lastWorn)+'d ago':'never'}</div>
     </div>
   </div>`;
 }
@@ -1747,7 +1764,7 @@ async function saveItemModal(){
     showToast('Item updated!');
   } else {
     const name=`${CATS[cat].label} ${items.filter(i=>i.cat===cat).length+1}`;
-    const newItem={id:'i'+Date.now(),name,cat,emoji:CATS[cat].emoji,img,seasons,conditions,occasion,unavailable,wornCount:0,lastWorn:daysAgo(0)};
+    const newItem={id:'i'+Date.now(),name,cat,emoji:CATS[cat].emoji,img,seasons,conditions,occasion,unavailable,wornCount:0,lastWorn:''};
     items.push(newItem);
     closeItemModal();renderWardrobe();showSaving();
     await apiCall({action:'saveItem',data:newItem});
@@ -1956,7 +1973,7 @@ async function saveOutfit(){
     accessories:Object.values(accByCat).flat(),
     accByCat:JSON.stringify(accByCat),
     seasons:[],conditions:[],
-    lastWorn:daysAgo(30)
+    lastWorn:''
   };
   outfits=outfits.filter(x=>x.id!=='__preview__');
   outfits.push({...outfit,accByCat});
