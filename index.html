@@ -413,8 +413,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
     <div class="date-pick-label">Date</div>
     <input class="date-input" type="date" id="detail-date-input" style="font-size:11px;padding:6px 10px;width:auto;">
   </div>
-  <button class="btn-outline" style="margin-top:1rem;width:100%;" onclick="openEditAccFromDatePick()">Edit accessories</button>
-  <button class="confirm-btn" onclick="confirmWornFromDetail()">Log this outfit</button>
+  <button class="confirm-btn" onclick="confirmWornFromDetail()">Next</button>
 </div>
 
 <!-- DAY DETAIL -->
@@ -1081,8 +1080,12 @@ function closeOutfitDetail(){
 
 function wearOutfitFromDetail(){
   if(!currentOutfitDetailId)return;
-  closeOutfitDetail();
-  openWearing(currentOutfitDetailId);
+  document.getElementById('date-pick-screen').dataset.outfitId=currentOutfitDetailId;
+  const dateInput=document.getElementById('detail-date-input');
+  dateInput.value=todayStr();
+  dateInput.max=todayStr();
+  document.getElementById('outfit-detail-screen').style.visibility='hidden';
+  document.getElementById('date-pick-screen').classList.add('open');
 }
 
 function openEditAccFromDatePick(){
@@ -1097,37 +1100,17 @@ function openEditAccFromDatePick(){
 
 function closeDatePickScreen(){
   document.getElementById('date-pick-screen').classList.remove('open');
+  document.getElementById('outfit-detail-screen').style.visibility='';
   const oid=document.getElementById('date-pick-screen').dataset.outfitId;
   if(oid&&!currentOutfitDetailId)currentOutfitDetailId=oid;
 }
 
-async function confirmWornFromDetail(){
+function confirmWornFromDetail(){
   const oid=document.getElementById('date-pick-screen').dataset.outfitId||currentOutfitDetailId;
-  const o=outfits.find(x=>x.id===oid);
-  if(!o)return;
-  const chosenAccs=[...document.querySelectorAll('#outfit-detail-acc-summary .acc-option.selected')]
-    .map(el=>el.id.replace('dopt-',''));
   const logDate=document.getElementById('detail-date-input').value||todayStr();
-  const log={
-    id:'l'+Date.now(),date:logDate,
-    outfitId:o.id,outfitNum:o.num,
-    pieces:o.pieces,accessories:chosenAccs,
-    tempC:weather.tempC,condition:weather.condition,weatherLabel:weather.label
-  };
-  o.lastWorn=new Date().toISOString();
-  const allWorn=[...o.pieces,...chosenAccs];
-  allWorn.forEach(pid=>{const it=getItem(pid);if(it){it.lastWorn=new Date().toISOString();it.wornCount=(it.wornCount||0)+1;}});
-  wornLogs.push(log);
-  closeDatePickScreen();
-  closeOutfitDetail();
-  renderCalendar();
-  showSaving();
-  await Promise.all([
-    apiCall({action:'updateOutfit',data:{...o,accByCat:JSON.stringify(o.accByCat)}}),
-    apiCall({action:'saveLog',data:log}),
-    ...allWorn.map(pid=>{const it=getItem(pid);return it?apiCall({action:'updateItem',data:it}):Promise.resolve();})
-  ]);
-  showToast('Outfit logged!');
+  document.getElementById('date-pick-screen').classList.remove('open');
+  document.getElementById('outfit-detail-screen').style.visibility='';
+  openWearing(oid, logDate);
 }
 
 // ===== ITEM 5: Edit Accessories — accordion per category + item 4 season greying =====
