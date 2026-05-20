@@ -113,7 +113,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
 .acc-cat-title{font-size:12px;font-weight:500;color:var(--ink-soft);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em;}
 .acc-options{display:flex;gap:8px;flex-wrap:wrap;}
 .acc-option{display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;}
-.acc-option-weather-na{opacity:.35;}
 .acc-option-thumb{width:60px;height:60px;border-radius:var(--rsm);background:var(--warm);border:2px solid var(--border);overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:24px;transition:border-color .15s;}
 .acc-option-thumb img{width:100%;height:100%;object-fit:contain;}
 .acc-option.selected .acc-option-thumb{border-color:var(--sage);}
@@ -866,7 +865,7 @@ function buildFlatlay(outfitId,sm=false){
   cols.forEach((col,ci)=>{
     const colNum=ci+1;
     if(col.span){
-      const ar=dressOnly?'aspect-ratio:3/4':'';
+      const ar=dressOnly?'aspect-ratio:3/4':'aspect-ratio:3/5';
       cellsHtml+=`<div class="flatlay-cell" style="grid-column:${colNum};grid-row:${dressOnly?'1':'1/3'};${ar};">${renderCellInner(col.items[0],false)}</div>`;
     } else {
       const showMore=col.accOverflow>0;
@@ -912,7 +911,7 @@ function buildFlatlayCore(outfitId){
   cols.forEach((col,ci)=>{
     const colNum=ci+1;
     if(col.span){
-      const ar=dressOnly?'aspect-ratio:3/4':'';
+      const ar=dressOnly?'aspect-ratio:3/4':'aspect-ratio:3/5';
       cellsHtml+=`<div class="flatlay-cell" style="grid-column:${colNum};grid-row:${dressOnly?'1':'1/3'};${ar};">${renderCellInner(col.items[0],false)}</div>`;
     } else {
       cellsHtml+=`<div class="flatlay-cell" style="grid-column:${colNum};grid-row:1;aspect-ratio:1/1;">${renderCellInner(col.items[0],false)}</div>`;
@@ -1306,25 +1305,42 @@ function openWearing(outfitId,dateOverride){
   document.getElementById('wearing-core').innerHTML=pieces.map(p=>`
     <div class="wearing-piece-thumb">${p.img?`<img src="${p.img}" loading="lazy">`:`<span>${p.emoji||'👕'}</span>`}</div>`).join('');
 
+  // Use log's own weather for past edits, today's weather for current
+  let filterTempC=weather.tempC, filterCond=weather.condition;
+  if(editingLogId){
+    const log=wornLogs.find(l=>l.id===editingLogId);
+    if(log){filterTempC=log.tempC;filterCond=log.condition;}
+  }
+
   const accByCat=o.accByCat||{};
   const sections=document.getElementById('wearing-acc-sections');
   sections.innerHTML='';
   ACC_CATS.forEach(cat=>{
-    const linked=(accByCat[cat]||[]).map(id=>getItem(id)).filter(Boolean);
+    const linked=(accByCat[cat]||[]).map(id=>getItem(id)).filter(Boolean)
+      .filter(a=>accWeatherOk(a,filterTempC,filterCond));
     if(!linked.length)return;
     const sec=document.createElement('div');
     sec.className='acc-cat-section';
     sec.innerHTML=`<div class="acc-cat-title">${CATS[cat].label}</div>
       <div class="acc-options" id="acc-opts-${cat}">
-        ${linked.map(a=>{
-          const weatherBad=!accWeatherOk(a,weather.tempC,weather.condition);
-          return`<div class="acc-option${weatherBad?' acc-option-weather-na':''}" id="aopt-${a.id}" onclick="selectAcc('${cat}','${a.id}')">
-            <div class="acc-option-thumb">${a.img?`<img src="${a.img}" loading="lazy">`:`<span>${a.emoji||'💍'}</span>`}</div>
-          </div>`;
-        }).join('')}
+        ${linked.map(a=>`<div class="acc-option" id="aopt-${a.id}" onclick="selectAcc('${cat}','${a.id}')">
+          <div class="acc-option-thumb">${a.img?`<img src="${a.img}" loading="lazy">`:`<span>${a.emoji||'💍'}</span>`}</div>
+        </div>`).join('')}
       </div>`;
     sections.appendChild(sec);
   });
+
+  // Pre-select previously chosen accessories when editing a past log
+  if(editingLogId){
+    const log=wornLogs.find(l=>l.id===editingLogId);
+    if(log){
+      (log.accessories||[]).forEach(id=>{
+        const el=document.getElementById(`aopt-${id}`);
+        if(el)el.classList.add('selected');
+      });
+    }
+  }
+
   document.getElementById('wearing-screen').classList.add('open');
 }
 
