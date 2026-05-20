@@ -50,8 +50,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
 .wear-btn:hover{opacity:.8;}
 
 /* FLAT-LAY OUTFIT GRID */
-.flatlay{display:grid;grid-template-rows:auto auto;width:100%;border-radius:var(--rsm);overflow:hidden;background:var(--cream);}
-.flatlay-cell{overflow:hidden;display:flex;align-items:center;justify-content:center;background:var(--cream);border:1px solid var(--border);font-size:22px;position:relative;aspect-ratio:1/1;}
+.flatlay{display:grid;grid-template-rows:1fr 1fr;width:100%;border-radius:var(--rsm);overflow:hidden;background:var(--cream);align-items:stretch;}
+.flatlay-cell{overflow:hidden;display:flex;align-items:center;justify-content:center;background:var(--cream);border:1px solid var(--border);font-size:22px;position:relative;}
 .flatlay-cell img{width:100%;height:100%;object-fit:contain;}
 .flatlay-more{position:absolute;inset:0;background:rgba(26,23,20,.55);display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:500;}
 .flatlay-sm .flatlay-cell{min-height:16px;font-size:8px;}
@@ -865,8 +865,8 @@ function buildFlatlay(outfitId,sm=false){
   cols.forEach((col,ci)=>{
     const colNum=ci+1;
     if(col.span){
-      const ar=dressOnly?'aspect-ratio:3/4':'aspect-ratio:3/5';
-      cellsHtml+=`<div class="flatlay-cell" style="grid-column:${colNum};grid-row:${dressOnly?'1':'1/3'};${ar};">${renderCellInner(col.items[0],false)}</div>`;
+      const ar=dressOnly?'aspect-ratio:3/4':'';
+      cellsHtml+=`<div class="flatlay-cell" style="grid-column:${colNum};grid-row:${dressOnly?'1':'1/3'};${ar};align-self:stretch;height:100%;">${renderCellInner(col.items[0],false)}</div>`;
     } else {
       const showMore=col.accOverflow>0;
       cellsHtml+=`<div class="flatlay-cell" style="grid-column:${colNum};grid-row:1;aspect-ratio:1/1;">${renderCellInner(col.items[0],false)}</div>`;
@@ -911,8 +911,8 @@ function buildFlatlayCore(outfitId){
   cols.forEach((col,ci)=>{
     const colNum=ci+1;
     if(col.span){
-      const ar=dressOnly?'aspect-ratio:3/4':'aspect-ratio:3/5';
-      cellsHtml+=`<div class="flatlay-cell" style="grid-column:${colNum};grid-row:${dressOnly?'1':'1/3'};${ar};">${renderCellInner(col.items[0],false)}</div>`;
+      const ar=dressOnly?'aspect-ratio:3/4':'';
+      cellsHtml+=`<div class="flatlay-cell" style="grid-column:${colNum};grid-row:${dressOnly?'1':'1/3'};${ar};align-self:stretch;height:100%;">${renderCellInner(col.items[0],false)}</div>`;
     } else {
       cellsHtml+=`<div class="flatlay-cell" style="grid-column:${colNum};grid-row:1;aspect-ratio:1/1;">${renderCellInner(col.items[0],false)}</div>`;
       cellsHtml+=`<div class="flatlay-cell" style="grid-column:${colNum};grid-row:2;aspect-ratio:2/3;">${renderCellInner(col.items[1],false)}</div>`;
