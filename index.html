@@ -537,7 +537,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
 <div class="link-outfits-screen" id="link-outfits-screen">
   <button class="link-outfits-back" onclick="closeLinkOutfits()">&#8592; Back</button>
   <div class="link-outfits-title">Link to outfits</div>
-  <div class="link-outfits-hint" id="link-outfits-hint">Select the core pieces this accessory goes with. It will be linked to every outfit containing any of these pieces.</div>
+  <div class="link-outfits-hint">Select the core pieces this accessory goes with. It will be linked to every outfit containing any of these pieces.</div>
   <div id="link-outfits-content"></div>
   <button class="link-outfits-confirm-btn" onclick="confirmLinkOutfits()">Link to outfits</button>
 </div>
@@ -1614,7 +1614,6 @@ function openEditModal(id){
   document.getElementById('img-preview-box').innerHTML=item.img?`<img src="${item.img}" loading="lazy">`:'No photo';
   document.getElementById('icat').value=item.cat;
   document.getElementById('modal-del-btn').style.display='block';
-  // Show "Link to outfits" button only for accessory items
   document.getElementById('modal-link-btn').style.display=ACC_CATS.includes(item.cat)?'block':'none';
   document.getElementById('worn-count-section').style.display='block';
   document.getElementById('worn-count-badge').textContent=`${CATS[item.cat]?.emoji||'👕'} Worn ${item.wornCount||0} times`;
@@ -1772,6 +1771,42 @@ function onCatChange(cat){
 async function saveItemModal(){
   const cat=document.getElementById('icat').value;
   const rawImg=document.getElementById('iimg').value.trim();
+  const item=items.find(i=>i.id===editingItemId);
+  const isAcc=item&&ACC_CATS.includes(item.cat);
+
+  // Fast path: only unlinking outfits — no img validation needed
+  if(editingItemId&&pairedMarkedForRemoval.size>0&&isAcc){
+    const promises=[];
+    pairedMarkedForRemoval.forEach(outfitId=>{
+      const o=outfits.find(x=>x.id===outfitId);
+      if(!o)return;
+      ACC_CATS.forEach(c=>{if(o.accByCat[c])o.accByCat[c]=o.accByCat[c].filter(a=>a!==editingItemId);});
+      o.accessories=Object.values(o.accByCat).flat();
+      promises.push(apiCall({action:'updateOutfit',data:{...o,accByCat:JSON.stringify(o.accByCat)}}));
+    });
+    // Also save item field changes if img is valid
+    const img=toDirectUrl(rawImg)||null;
+    if(img&&item){
+      const seasons=[],conditions=[];
+      document.querySelectorAll('[data-itag].active').forEach(b=>{
+        const[g,v]=b.dataset.itag.split(':');
+        if(g==='season')seasons.push(v);
+        if(g==='condition')conditions.push(v);
+      });
+      const occasion=OCCASION_CATS.includes(cat)&&document.getElementById('occasion-tog').classList.contains('active');
+      const unavailable=document.getElementById('unavailable-tog').classList.contains('active');
+      Object.assign(item,{cat,img,seasons,conditions,emoji:CATS[cat].emoji,occasion,unavailable});
+      promises.push(apiCall({action:'updateItem',data:item}));
+    }
+    closeItemModal();
+    const wBtn=document.querySelector('.tab[onclick*="wardrobe"]');
+    if(wBtn)switchTab('wardrobe',wBtn);
+    showSaving();
+    await Promise.all(promises);
+    showToast('Saved!');
+    return;
+  }
+
   if(!rawImg){showToast('Please add a Google Drive link');return;}
   const img=toDirectUrl(rawImg)||null;
   if(!img){showToast('Invalid link');return;}
@@ -1783,38 +1818,22 @@ async function saveItemModal(){
   });
   const occasion=OCCASION_CATS.includes(cat)&&document.getElementById('occasion-tog').classList.contains('active');
   const unavailable=document.getElementById('unavailable-tog').classList.contains('active');
-  const item=items.find(i=>i.id===editingItemId);
-  const isCore=item&&CORE_CATS.includes(item.cat);
-  const isAcc=item&&ACC_CATS.includes(item.cat);
-
-  if(pairedMarkedForRemoval.size>0){
-    if(isAcc){
-      // Unlink accessory from marked outfits
-      const removalPromises=[];
-      pairedMarkedForRemoval.forEach(outfitId=>{
-        const o=outfits.find(x=>x.id===outfitId);
-        if(!o)return;
-        ACC_CATS.forEach(c=>{
-          if(o.accByCat[c])o.accByCat[c]=o.accByCat[c].filter(a=>a!==editingItemId);
-        });
-        o.accessories=Object.values(o.accByCat).flat();
-        removalPromises.push(apiCall({action:'updateOutfit',data:{...o,accByCat:JSON.stringify(o.accByCat)}}));
-      });
-      await Promise.all(removalPromises);
-    }
-  }
 
   if(editingItemId){
     if(item)Object.assign(item,{cat,img,seasons,conditions,emoji:CATS[cat].emoji,occasion,unavailable});
-    closeItemModal();renderWardrobe();showSaving();
+    closeItemModal();
+    const wBtn=document.querySelector('.tab[onclick*="wardrobe"]');
+    if(wBtn)switchTab('wardrobe',wBtn);
+    showSaving();
     await apiCall({action:'updateItem',data:item});
     showToast('Item updated!');
   } else {
     const name=`${CATS[cat].label} ${items.filter(i=>i.cat===cat).length+1}`;
     const newItem={id:'i'+Date.now(),name,cat,emoji:CATS[cat].emoji,img,seasons,conditions,occasion,unavailable,wornCount:0,lastWorn:''};
     items.push(newItem);
-    closeItemModal();renderWardrobe();
-    // Fire save in background — don't await
+    closeItemModal();
+    const wBtn=document.querySelector('.tab[onclick*="wardrobe"]');
+    if(wBtn)switchTab('wardrobe',wBtn);
     apiCall({action:'saveItem',data:newItem});
     if(ACC_CATS.includes(cat)){
       openLinkOutfits(newItem.id);
@@ -1860,10 +1879,8 @@ function openLinkOutfits(itemId){
   if(!item)return;
   linkingItemId=itemId;
   linkSelectedPieceIds=new Set();
-
   const content=document.getElementById('link-outfits-content');
   content.innerHTML='';
-
   CORE_CATS.forEach(cat=>{
     const catItems=items.filter(i=>i.cat===cat);
     if(!catItems.length)return;
@@ -1872,17 +1889,16 @@ function openLinkOutfits(itemId){
     div.innerHTML=`<div class="link-outfits-cat-header" onclick="toggleLinkOutfitsCat('lo-cat-${cat}',this)">
         ${CATS[cat].label}
         <span class="acc-count-pill">${catItems.length}</span>
-        <span class="acc-arrow">▸</span>
+        <span class="acc-arrow">&#9658;</span>
       </div>
       <div class="link-outfits-options" id="lo-cat-${cat}">
         ${catItems.map(p=>`
           <div class="link-outfits-item" id="lo-${p.id}" onclick="toggleLinkOutfitsItem('${p.id}')">
-            <div class="link-outfits-thumb">${p.img?`<img src="${p.img}" loading="lazy">`:`<span>${p.emoji||CATS[p.cat]?.emoji||'👕'}</span>`}</div>
+            <div class="link-outfits-thumb">${p.img?`<img src="${p.img}" loading="lazy">`:`<span>${p.emoji||CATS[p.cat]?.emoji||'&#128085;'}</span>`}</div>
           </div>`).join('')}
       </div>`;
     content.appendChild(div);
   });
-
   document.getElementById('link-outfits-screen').classList.add('open');
 }
 
@@ -1891,8 +1907,8 @@ function toggleLinkOutfitsCat(id,titleEl){
   const arrow=titleEl.querySelector('.acc-arrow');
   const isOpen=body.classList.contains('open');
   document.querySelectorAll('.link-outfits-options').forEach(b=>b.classList.remove('open'));
-  document.querySelectorAll('.link-outfits-cat-header .acc-arrow').forEach(a=>a.textContent='▸');
-  if(!isOpen){body.classList.add('open');arrow.textContent='▾';}
+  document.querySelectorAll('.link-outfits-cat-header .acc-arrow').forEach(a=>a.textContent='\u25b8');
+  if(!isOpen){body.classList.add('open');arrow.textContent='\u25be';}
 }
 
 function toggleLinkOutfitsItem(pieceId){
@@ -1907,31 +1923,24 @@ async function confirmLinkOutfits(){
   const item=items.find(i=>i.id===linkingItemId);
   if(!item){closeLinkOutfits();return;}
   const cat=item.cat;
-
-  // Find all outfits containing any of the selected pieces
-  const toLink=outfits.filter(o=>
-    (o.pieces||[]).some(pid=>linkSelectedPieceIds.has(pid))
-  );
-
-  // Only add link — skip outfits already linked
-  const toUpdate=toLink.filter(o=>
-    !Object.values(o.accByCat||{}).flat().includes(linkingItemId)
-  );
-
+  const toLink=outfits.filter(o=>(o.pieces||[]).some(pid=>linkSelectedPieceIds.has(pid)));
+  const toUpdate=toLink.filter(o=>!Object.values(o.accByCat||{}).flat().includes(linkingItemId));
   if(!toUpdate.length){
     showToast('Already linked to all matching outfits');
-    closeLinkOutfits();return;
+    closeLinkOutfits();
+    const wBtn=document.querySelector('.tab[onclick*="wardrobe"]');
+    if(wBtn)switchTab('wardrobe',wBtn);
+    return;
   }
-
   toUpdate.forEach(o=>{
     if(!o.accByCat[cat])o.accByCat[cat]=[];
     if(!o.accByCat[cat].includes(linkingItemId))o.accByCat[cat].push(linkingItemId);
     o.accessories=Object.values(o.accByCat).flat();
   });
-
   closeLinkOutfits();
+  const wBtn=document.querySelector('.tab[onclick*="wardrobe"]');
+  if(wBtn)switchTab('wardrobe',wBtn);
   showSaving();
-  // Show instant feedback, update when done
   showToast('Linking...');
   await Promise.all(toUpdate.map(o=>apiCall({action:'updateOutfit',data:{...o,accByCat:JSON.stringify(o.accByCat)}})));
   showToast(`Linked to ${toUpdate.length} outfit${toUpdate.length>1?'s':''}`,3500);
