@@ -759,7 +759,7 @@ function switchTab(name,btn){
 function getItem(id){return items.find(i=>i.id===id);}
 function daysAgo(n){const d=new Date();d.setDate(d.getDate()-n);return d.toISOString();}
 function daysSince(iso){if(!iso)return 999;return Math.round((Date.now()-new Date(iso))/86400000);}
-function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500);}
+function showToast(msg,duration){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(t._timer);t._timer=setTimeout(()=>t.classList.remove('show'),duration||2500);}
 function todayStr(){return new Date().toLocaleDateString('en-CA');}
 
 function isOccasionOutfit(o){
@@ -1813,12 +1813,13 @@ async function saveItemModal(){
     const name=`${CATS[cat].label} ${items.filter(i=>i.cat===cat).length+1}`;
     const newItem={id:'i'+Date.now(),name,cat,emoji:CATS[cat].emoji,img,seasons,conditions,occasion,unavailable,wornCount:0,lastWorn:''};
     items.push(newItem);
-    closeItemModal();renderWardrobe();showSaving();
-    await apiCall({action:'saveItem',data:newItem});
-    showToast('Item added!');
-    // Prompt to link to outfits if it's an accessory
+    closeItemModal();renderWardrobe();
+    // Fire save in background — don't await
+    apiCall({action:'saveItem',data:newItem});
     if(ACC_CATS.includes(cat)){
-      setTimeout(()=>openLinkOutfits(newItem.id),400);
+      openLinkOutfits(newItem.id);
+    } else {
+      showToast('Item added!');
     }
   }
 }
@@ -1930,8 +1931,10 @@ async function confirmLinkOutfits(){
 
   closeLinkOutfits();
   showSaving();
+  // Show instant feedback, update when done
+  showToast('Linking...');
   await Promise.all(toUpdate.map(o=>apiCall({action:'updateOutfit',data:{...o,accByCat:JSON.stringify(o.accByCat)}})));
-  showToast(`Linked to ${toUpdate.length} outfit${toUpdate.length>1?'s':''}`);
+  showToast(`Linked to ${toUpdate.length} outfit${toUpdate.length>1?'s':''}`,3500);
 }
 
 function closeLinkOutfits(){
