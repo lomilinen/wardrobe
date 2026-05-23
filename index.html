@@ -54,8 +54,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
 .flatlay-cell{overflow:hidden;display:flex;align-items:center;justify-content:center;background:var(--cream);border:1px solid var(--border);font-size:22px;position:relative;min-height:80px;}
 .flatlay-cell img{width:100%;height:100%;object-fit:contain;}
 .flatlay-more{position:absolute;inset:0;background:rgba(26,23,20,.55);display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:500;}
-.flatlay-sm .flatlay-cell{min-height:16px;font-size:8px;}
-.flatlay-sm .flatlay-cell img{object-fit:cover;}
+.flatlay-sm .flatlay-cell{font-size:8px;}
+.flatlay-sm .flatlay-cell img{object-fit:contain;}
 
 /* OUTFIT CARD */
 .outfit-card{background:var(--warm);border:1px solid var(--border);border-radius:var(--r);cursor:pointer;transition:border-color .15s;position:relative;}
@@ -818,19 +818,26 @@ function buildFlatlay(outfitId,sm=false){
   if(!cols.length)return'';
 
   const numCols=cols.length;
+  const dressOnly=cols.filter(c=>!c.isAcc).every(c=>c.span);
   let cellsHtml='';
   cols.forEach((col,ci)=>{
     const colNum=ci+1;
     if(col.span){
-      cellsHtml+=`<div class="flatlay-cell" style="grid-column:${colNum};grid-row:1/3;">${renderCellInner(col.items[0],false)}</div>`;
+      const ar=dressOnly?'aspect-ratio:3/4':'';
+      cellsHtml+=`<div class="flatlay-cell" style="grid-column:${colNum};grid-row:${dressOnly?'1':'1/3'};${ar};align-self:stretch;height:100%;">${renderCellInner(col.items[0],false)}</div>`;
     } else {
       const showMore=col.accOverflow>0;
-      cellsHtml+=`<div class="flatlay-cell" style="grid-column:${colNum};grid-row:1;">${renderCellInner(col.items[0],false)}</div>`;
-      cellsHtml+=`<div class="flatlay-cell" style="grid-column:${colNum};grid-row:2;">${renderCellInner(col.items[1],showMore,col.accOverflow)}</div>`;
+      if(col.items[1]!==undefined&&col.items[1]!==null){
+        cellsHtml+=`<div class="flatlay-cell" style="grid-column:${colNum};grid-row:1;aspect-ratio:1/1;">${renderCellInner(col.items[0],false)}</div>`;
+        cellsHtml+=`<div class="flatlay-cell" style="grid-column:${colNum};grid-row:2;aspect-ratio:2/3;">${renderCellInner(col.items[1],showMore,col.accOverflow)}</div>`;
+      } else {
+        cellsHtml+=`<div class="flatlay-cell" style="grid-column:${colNum};grid-row:1/3;aspect-ratio:1/2;">${renderCellInner(col.items[0],false)}</div>`;
+      }
     }
   });
 
-  return`<div class="${sm?'flatlay flatlay-sm':'flatlay'}" style="grid-template-columns:repeat(${numCols},1fr);">${cellsHtml}</div>`;
+  const rows=dressOnly?'auto':'auto auto';
+  return`<div class="${sm?'flatlay flatlay-sm':'flatlay'}" style="grid-template-columns:repeat(${numCols},1fr);grid-template-rows:${rows};">${cellsHtml}</div>`;
 }
 
 // Core-only flatlay for outfit grid cards (item 1: same dynamic column logic, no accs)
@@ -1184,10 +1191,12 @@ async function saveEditAcc(){
 let editingLogId=null;
 
 function editLogAccFromSheet(logId,outfitId){
+  const log=wornLogs.find(l=>l.id===logId);
+  const o=outfits.find(x=>x.id===outfitId);
+  if(!log||!o)return;
   editingLogId=logId;
   closeDayDetail();
-  currentOutfitDetailId=outfitId;
-  openEditAccFromDetail();
+  openWearing(outfitId,log.date);
 }
 
 async function saveEditAccForLog(){
@@ -1262,6 +1271,18 @@ function openWearing(outfitId,dateOverride){
       </div>`;
     sections.appendChild(sec);
   });
+
+  // Pre-select previously chosen accessories when editing a past log
+  if(editingLogId){
+    const log=wornLogs.find(l=>l.id===editingLogId);
+    if(log){
+      (log.accessories||[]).forEach(id=>{
+        const el=document.getElementById(`aopt-${id}`);
+        if(el)el.classList.add('selected');
+      });
+    }
+  }
+
   document.getElementById('wearing-screen').classList.add('open');
 }
 
