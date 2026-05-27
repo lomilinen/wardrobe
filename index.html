@@ -51,7 +51,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
 
 /* FLAT-LAY OUTFIT GRID */
 .flatlay{display:grid;grid-template-rows:auto auto;width:100%;border-radius:var(--rsm);overflow:hidden;background:var(--cream);}
-.flatlay-cell{display:flex;align-items:center;justify-content:center;background:var(--cream);border:1px solid var(--border);font-size:22px;position:relative;}
+.flatlay-cell{overflow:hidden;display:flex;align-items:center;justify-content:center;background:var(--cream);border:1px solid var(--border);font-size:22px;position:relative;min-width:0;}
 .flatlay-cell img{width:100%;height:100%;object-fit:contain;}
 .flatlay-more{position:absolute;inset:0;background:rgba(26,23,20,.55);display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:500;}
 .flatlay-sm .flatlay-cell{min-height:30px;font-size:8px;}
@@ -295,18 +295,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
     <div class="wcontrols">
       <div class="catfilter" id="cat-filter-btns"></div>
     </div>
-    <div class="wcontrols" style="margin-top:-0.5rem;">
-      <select class="fselect" id="wardrobe-sort" onchange="renderWardrobe()" style="width:auto;font-size:12px;padding:7px 10px;">
-        <option value="">Default</option>
-        <option value="most-worn">Most worn (logs)</option>
-        <option value="least-worn">Least worn (logs)</option>
-        <option value="most-outfits">Most outfits</option>
-        <option value="least-outfits">Least outfits</option>
-      </select>
-      <button class="catbtn" id="wardrobe-weather-btn" onclick="toggleWardrobeWeatherPicker()" style="font-size:12px;position:relative;">
-        Weather <span id="wardrobe-weather-count"></span>
-      </button>
-      <div id="wardrobe-weather-picker" style="display:none;position:absolute;background:var(--warm);border:1px solid var(--border);border-radius:var(--rsm);padding:10px;z-index:50;box-shadow:0 4px 16px rgba(0,0,0,.1);margin-top:4px;">
+    <div class="wcontrols" style="margin-top:-0.5rem;flex-wrap:wrap;gap:6px;">
+      <button class="catbtn" id="wardrobe-sort-btn" onclick="cycleWardrobeSort()">Least used</button>
+      <button class="catbtn" id="wardrobe-weather-btn" onclick="toggleWardrobeWeatherPicker()">Weather <span id="wardrobe-weather-count"></span></button>
+      <div id="wardrobe-weather-picker" style="display:none;position:fixed;background:var(--warm);border:1px solid var(--border);border-radius:var(--rsm);padding:10px;z-index:150;box-shadow:0 4px 16px rgba(0,0,0,.12);width:220px;">
         <div style="font-size:11px;color:var(--ink-faint);margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em;">Temperature</div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">
           <button class="wtag" data-wfilter="freezing" onclick="toggleWardrobeWeather(this)">❄️ Freezing</button>
@@ -315,34 +307,29 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
           <button class="wtag" data-wfilter="warm" onclick="toggleWardrobeWeather(this)">☀️ Warm</button>
         </div>
         <div style="font-size:11px;color:var(--ink-faint);margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em;">Condition</div>
-        <div style="display:flex;gap:6px;">
+        <div style="display:flex;gap:6px;margin-bottom:10px;">
           <button class="wtag" data-wfilter="rainy" onclick="toggleWardrobeWeather(this)">🌧️ Rainy ok</button>
         </div>
-        <button onclick="toggleWardrobeWeatherPicker()" style="margin-top:10px;width:100%;padding:6px;border-radius:var(--rsm);border:1px solid var(--border);background:var(--ink);color:var(--warm);font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;">Done</button>
+        <button onclick="toggleWardrobeWeatherPicker()" style="width:100%;padding:6px;border-radius:var(--rsm);border:none;background:var(--ink);color:var(--warm);font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;">Done</button>
       </div>
-      <select class="fselect" id="wardrobe-type" onchange="renderWardrobe()" style="width:auto;font-size:12px;padding:7px 10px;">
-        <option value="">All types</option>
-        <option value="everyday">Everyday</option>
-        <option value="occasion">🎉 Occasion</option>
-        <option value="unavailable">🚫 Unavailable</option>
-      </select>
+      <button class="catbtn" id="wardrobe-type-btn" onclick="cycleWardrobeType()">All types</button>
       <button class="addbtn" onclick="openAddModal()">+ Add</button>
-      <button class="btn-outline" id="wardrobe-select-btn" onclick="toggleWardrobeSelectMode()" style="font-size:12px;padding:7px 12px;white-space:nowrap;">Select</button>
+      <button class="catbtn" id="wardrobe-select-btn" onclick="toggleWardrobeSelectMode()">Select</button>
     </div>
     <div id="items-grid"></div>
+  </div>
+  <div class="wardrobe-select-bar" id="wardrobe-select-bar">
+    <button class="wsbar-btn wsbar-unavail" onclick="bulkSetUnavailable(true)">🚫 Mark unavailable</button>
+    <button class="wsbar-btn wsbar-avail" onclick="bulkSetUnavailable(false)">✓ Mark available</button>
+    <button class="wsbar-btn wsbar-cancel" onclick="exitWardrobeSelectMode()">Cancel</button>
   </div>
 
   <!-- OUTFITS -->
   <div id="view-outfits" class="view">
-    <div class="outfits-controls">
-      <select class="fselect" id="outfits-sort" onchange="renderOutfits()" style="width:auto;font-size:12px;padding:7px 10px;">
-        <option value="least">Least worn</option>
-        <option value="most">Most worn</option>
-      </select>
-      <button class="catbtn" id="outfits-weather-btn" onclick="toggleOutfitsWeatherPicker()" style="font-size:12px;position:relative;">
-        Weather <span id="outfits-weather-count"></span>
-      </button>
-      <div id="outfits-weather-picker" style="display:none;position:absolute;background:var(--warm);border:1px solid var(--border);border-radius:var(--rsm);padding:10px;z-index:50;box-shadow:0 4px 16px rgba(0,0,0,.1);margin-top:4px;">
+    <div class="outfits-controls" style="flex-wrap:wrap;gap:6px;">
+      <button class="catbtn" id="outfits-sort-btn" onclick="cycleOutfitsSort()">Least worn</button>
+      <button class="catbtn" id="outfits-weather-btn" onclick="toggleOutfitsWeatherPicker()">Weather <span id="outfits-weather-count"></span></button>
+      <div id="outfits-weather-picker" style="display:none;position:fixed;background:var(--warm);border:1px solid var(--border);border-radius:var(--rsm);padding:10px;z-index:150;box-shadow:0 4px 16px rgba(0,0,0,.12);width:220px;">
         <div style="font-size:11px;color:var(--ink-faint);margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em;">Temperature</div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">
           <button class="wtag" data-ofilter="freezing" onclick="toggleOutfitsWeather(this)">❄️ Freezing</button>
@@ -351,17 +338,12 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
           <button class="wtag" data-ofilter="warm" onclick="toggleOutfitsWeather(this)">☀️ Warm</button>
         </div>
         <div style="font-size:11px;color:var(--ink-faint);margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em;">Condition</div>
-        <div style="display:flex;gap:6px;">
+        <div style="display:flex;gap:6px;margin-bottom:10px;">
           <button class="wtag" data-ofilter="rainy" onclick="toggleOutfitsWeather(this)">🌧️ Rainy ok</button>
         </div>
-        <button onclick="toggleOutfitsWeatherPicker()" style="margin-top:10px;width:100%;padding:6px;border-radius:var(--rsm);border:1px solid var(--border);background:var(--ink);color:var(--warm);font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;">Done</button>
+        <button onclick="toggleOutfitsWeatherPicker()" style="width:100%;padding:6px;border-radius:var(--rsm);border:none;background:var(--ink);color:var(--warm);font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;">Done</button>
       </div>
-      <select class="fselect" id="outfits-type" onchange="renderOutfits()" style="width:auto;font-size:12px;padding:7px 10px;">
-        <option value="">All types</option>
-        <option value="everyday" selected>Everyday</option>
-        <option value="occasion">🎉 Occasion</option>
-        <option value="unavailable">🚫 Unavailable</option>
-      </select>
+      <button class="catbtn active" id="outfits-type-btn" onclick="cycleOutfitsType()">Everyday</button>
       <div id="outfits-bulk-controls" style="display:none;margin-left:auto;">
         <button class="btn-danger" style="font-size:12px;padding:7px 12px;" onclick="bulkDeleteOutfits()">Delete selected</button>
       </div>
@@ -608,6 +590,50 @@ let editAccOutfitId=null,editAccState={};
 let wardrobeSelectMode=false,wardrobeSelected=new Set();
 let wardrobeWeatherFilters=new Set();
 let outfitsWeatherFilters=new Set();
+
+// Wardrobe sort/type state
+const WARDROBE_SORTS=['','least-worn','most-worn','least-outfits','most-outfits'];
+const WARDROBE_SORT_LABELS=['Default','Least worn','Most worn','Fewest outfits','Most outfits'];
+let wardrobeSortIdx=0;
+
+const WARDROBE_TYPES=['','everyday','occasion','unavailable'];
+const WARDROBE_TYPE_LABELS=['All types','Everyday','🎉 Occasion','🚫 Unavailable'];
+let wardrobeTypeIdx=0;
+
+// Outfits sort/type state
+const OUTFITS_SORTS=['least','most'];
+const OUTFITS_SORT_LABELS=['Least worn','Most worn'];
+let outfitsSortIdx=0;
+
+const OUTFITS_TYPES=['','everyday','occasion','unavailable'];
+const OUTFITS_TYPE_LABELS=['All types','Everyday','🎉 Occasion','🚫 Unavailable'];
+let outfitsTypeIdx=1; // default Everyday
+
+function cycleWardrobeSort(){
+  wardrobeSortIdx=(wardrobeSortIdx+1)%WARDROBE_SORTS.length;
+  document.getElementById('wardrobe-sort-btn').textContent=WARDROBE_SORT_LABELS[wardrobeSortIdx];
+  document.getElementById('wardrobe-sort-btn').classList.toggle('active',wardrobeSortIdx>0);
+  renderWardrobe();
+}
+function cycleWardrobeType(){
+  wardrobeTypeIdx=(wardrobeTypeIdx+1)%WARDROBE_TYPES.length;
+  document.getElementById('wardrobe-type-btn').textContent=WARDROBE_TYPE_LABELS[wardrobeTypeIdx];
+  document.getElementById('wardrobe-type-btn').classList.toggle('active',wardrobeTypeIdx>0);
+  renderWardrobe();
+}
+function cycleOutfitsSort(){
+  outfitsSortIdx=(outfitsSortIdx+1)%OUTFITS_SORTS.length;
+  document.getElementById('outfits-sort-btn').textContent=OUTFITS_SORT_LABELS[outfitsSortIdx];
+  document.getElementById('outfits-sort-btn').classList.toggle('active',outfitsSortIdx>0);
+  renderOutfits();
+}
+function cycleOutfitsType(){
+  outfitsTypeIdx=(outfitsTypeIdx+1)%OUTFITS_TYPES.length;
+  const btn=document.getElementById('outfits-type-btn');
+  btn.textContent=OUTFITS_TYPE_LABELS[outfitsTypeIdx];
+  btn.classList.toggle('active',outfitsTypeIdx>0);
+  renderOutfits();
+}
 
 // ===== API =====
 async function apiCall(params){
@@ -1007,8 +1033,8 @@ function outfitsChangePage(dir){
 
 // ===== OUTFITS TAB =====
 function renderOutfits(){
-  const sort=document.getElementById('outfits-sort')?.value||'least';
-  const typeFilter=document.getElementById('outfits-type')?.value||'';
+  const sort=OUTFITS_SORTS[outfitsSortIdx]||'least';
+  const typeFilter=OUTFITS_TYPES[outfitsTypeIdx]||'';
   outfitsPage=0;
 
   // Update weather button label
@@ -1424,8 +1450,8 @@ function closeWearing(){
 
 // ===== WARDROBE =====
 function renderWardrobe(){
-  const sortVal=document.getElementById('wardrobe-sort')?.value||'';
-  const typeFilter=document.getElementById('wardrobe-type')?.value||'';
+  const sortVal=WARDROBE_SORTS[wardrobeSortIdx]||'';
+  const typeFilter=WARDROBE_TYPES[wardrobeTypeIdx]||'';
   const grid=document.getElementById('items-grid');
   const isFiltered=currentCat!=='all';
   let html='';let totalFound=0;
@@ -1563,7 +1589,7 @@ function navigateOutfitDetail(dir){
 
 function navigateItemModal(dir){
   // Get flat sorted/filtered item list matching current wardrobe view
-  const typeFilter=document.getElementById('wardrobe-type')?.value||'';
+  const typeFilter=WARDROBE_TYPES[wardrobeTypeIdx]||'';
   const tempFilters=[...wardrobeWeatherFilters].filter(f=>f!=='rainy');
   const rainFilter=wardrobeWeatherFilters.has('rainy');
   let pool=(currentCat==='all'?items:items.filter(i=>i.cat===currentCat)).filter(i=>{
