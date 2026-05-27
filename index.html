@@ -325,8 +325,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
     <div id="items-grid"></div>
   </div>
   <div class="wardrobe-select-bar" id="wardrobe-select-bar">
-    <button class="wsbar-btn wsbar-unavail" onclick="bulkSetUnavailable(true)">🚫 Mark unavailable</button>
-    <button class="wsbar-btn wsbar-avail" onclick="bulkSetUnavailable(false)">✓ Mark available</button>
+    <span id="wardrobe-select-count" style="color:rgba(255,255,255,.6);font-size:12px;min-width:40px;"></span>
+    <button class="wsbar-btn wsbar-unavail" onclick="bulkSetUnavailable(true)">🚫 Unavailable</button>
+    <button class="wsbar-btn wsbar-avail" onclick="bulkSetUnavailable(false)">✓ Available</button>
     <button class="wsbar-btn wsbar-cancel" onclick="exitWardrobeSelectMode()">Cancel</button>
   </div>
 
@@ -412,7 +413,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
 <div class="detail-screen" id="outfit-detail-screen">
   <button class="detail-back" onclick="closeOutfitDetail()">&#8592; Back</button>
   <div class="detail-title" id="outfit-detail-title">Outfit</div>
-  <div style="margin-bottom:1.25rem;max-width:220px;max-height:180px;overflow:hidden;" id="outfit-detail-flatlay"></div>
+  <div style="margin-bottom:1.25rem;max-width:260px;" id="outfit-detail-flatlay"></div>
   <div id="outfit-detail-acc-summary" style="margin-bottom:1rem;"></div>
   <div class="detail-actions">
     <button class="btn-danger" onclick="deleteOutfitFromDetail()">Delete</button>
@@ -1527,12 +1528,31 @@ function renderWardrobe(){
 
 // ITEM 6: 4 per row — done via CSS (.items-grid uses repeat(4,1fr))
 function itemCard(item){
+  if(wardrobeSelectMode){
+    const sel=wardrobeSelected.has(item.id);
+    return`<div class="icard${item.unavailable?' icard-unavailable':''}${sel?' icard-selected':''}" onclick="toggleWardrobeItemSelect('${item.id}')" style="position:relative;">
+      ${sel?`<div style="position:absolute;top:4px;right:4px;width:18px;height:18px;border-radius:50%;background:var(--sage);display:flex;align-items:center;justify-content:center;z-index:2;"><svg width='10' height='10' viewBox='0 0 10 10'><polyline points='1.5,5 4,7.5 8.5,2.5' stroke='#fff' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg></div>`:`<div style="position:absolute;top:4px;right:4px;width:18px;height:18px;border-radius:50%;border:2px solid var(--border-mid);background:var(--warm);z-index:2;"></div>`}
+      <div class="iimg">${item.img?`<img src="${item.img}" loading="lazy">`:`<span>${item.emoji||CATS[item.cat]?.emoji||'👕'}</span>`}</div>
+      <div class="imeta">
+        <div class="iworn">${item.unavailable?'🚫 ':item.occasion?'🎉 ':''} ${item.wornCount||0}× · ${daysSince(item.lastWorn)}d ago</div>
+      </div>
+    </div>`;
+  }
   return`<div class="icard${item.unavailable?' icard-unavailable':''}" onclick="openEditModal('${item.id}')">
     <div class="iimg">${item.img?`<img src="${item.img}" loading="lazy">`:`<span>${item.emoji||CATS[item.cat]?.emoji||'👕'}</span>`}</div>
     <div class="imeta">
       <div class="iworn">${item.unavailable?'🚫 ':item.occasion?'🎉 ':''} ${item.wornCount||0}× · ${daysSince(item.lastWorn)}d ago</div>
     </div>
   </div>`;
+}
+
+function toggleWardrobeItemSelect(id){
+  if(wardrobeSelected.has(id))wardrobeSelected.delete(id);
+  else wardrobeSelected.add(id);
+  // Update count label in bar
+  const countEl=document.getElementById('wardrobe-select-count');
+  if(countEl)countEl.textContent=wardrobeSelected.size?` (${wardrobeSelected.size})`:'';
+  renderWardrobe();
 }
 
 function toggleWardrobeWeatherPicker(){
@@ -1638,8 +1658,30 @@ function exitWardrobeSelectMode(){
   if(bar)bar.classList.remove('open');
   const btn=document.getElementById('wardrobe-select-btn');
   if(btn)btn.style.display='';
+  const countEl=document.getElementById('wardrobe-select-count');
+  if(countEl)countEl.textContent='';
   // Only re-render wardrobe if we're on that tab
   if(document.getElementById('view-wardrobe')?.classList.contains('active'))renderWardrobe();
+}
+
+async function bulkSetUnavailable(makeUnavailable){
+  if(!wardrobeSelected.size)return;
+  const ids=[...wardrobeSelected];
+  // Update locally first
+  ids.forEach(id=>{
+    const item=items.find(i=>i.id===id);
+    if(item)item.unavailable=makeUnavailable;
+  });
+  exitWardrobeSelectMode();
+  showSaving();
+  // Save each to backend
+  for(const id of ids){
+    const item=items.find(i=>i.id===id);
+    if(!item)continue;
+    try{
+      await fetch(SCRIPT_URL,{method:'POST',body:JSON.stringify({action:'updateItem',item})});
+    }catch(e){console.error('bulkSetUnavailable error',e);}
+  }
 }
 
 function toggleWardrobeSection(id,titleEl){
