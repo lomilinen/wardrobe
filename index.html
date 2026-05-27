@@ -50,7 +50,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
 .wear-btn:hover{opacity:.8;}
 
 /* FLAT-LAY OUTFIT GRID */
-.flatlay{display:grid;grid-template-rows:auto auto;width:100%;border-radius:var(--rsm);overflow:hidden;background:var(--cream);}
+.flatlay{display:grid;grid-template-rows:auto auto;width:100%;border-radius:var(--rsm);background:var(--cream);}
 .flatlay-cell{overflow:hidden;display:flex;align-items:center;justify-content:center;background:var(--cream);border:1px solid var(--border);font-size:22px;position:relative;min-width:0;}
 .flatlay-cell img{width:100%;height:100%;object-fit:contain;}
 .flatlay-more{position:absolute;inset:0;background:rgba(26,23,20,.55);display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:500;}
@@ -241,6 +241,12 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
 .toast.show{transform:translateX(-50%) translateY(0);}
 .saving{position:fixed;top:1rem;right:1rem;font-size:11px;color:var(--ink-faint);background:var(--warm);border:1px solid var(--border);border-radius:var(--rpill);padding:4px 10px;z-index:50;opacity:0;transition:opacity .3s;}
 .saving.show{opacity:1;}
+.wardrobe-select-bar{display:none;position:fixed;bottom:70px;left:0;right:0;z-index:80;padding:10px 16px;background:var(--ink);gap:8px;align-items:center;}
+.wardrobe-select-bar.open{display:flex;}
+.wsbar-btn{flex:1;padding:10px;border-radius:var(--rsm);border:none;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;}
+.wsbar-unavail{background:var(--cream);color:var(--ink);}
+.wsbar-avail{background:var(--sage);color:#fff;}
+.wsbar-cancel{background:transparent;color:var(--warm);border:1px solid rgba(255,255,255,.3);flex:0 0 auto;padding:10px 14px;}
 
 /* CURATE SCREEN */
 .curate-screen{display:none;position:fixed;inset:0;background:var(--cream);z-index:120;overflow-y:auto;}
@@ -775,6 +781,8 @@ function switchTab(name,btn){
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.getElementById('view-'+name).classList.add('active');
   btn.classList.add('active');
+  // Always exit wardrobe select mode when leaving wardrobe
+  if(name!=='wardrobe')exitWardrobeSelectMode();
   if(name==='build')renderBuilder();
   if(name==='calendar')renderCalendar();
   if(name==='outfits')renderOutfits();
@@ -1613,6 +1621,25 @@ function outfitPieceKey(pieces){
 function isDuplicateOutfit(pieces){
   const key=outfitPieceKey(pieces);
   return outfits.filter(o=>o.id!=='__preview__').some(o=>outfitPieceKey(o.pieces||[])=== key);
+}
+
+function toggleWardrobeSelectMode(){
+  wardrobeSelectMode=true;
+  wardrobeSelected=new Set();
+  document.getElementById('wardrobe-select-bar').classList.add('open');
+  document.getElementById('wardrobe-select-btn').style.display='none';
+  renderWardrobe();
+}
+
+function exitWardrobeSelectMode(){
+  wardrobeSelectMode=false;
+  wardrobeSelected=new Set();
+  const bar=document.getElementById('wardrobe-select-bar');
+  if(bar)bar.classList.remove('open');
+  const btn=document.getElementById('wardrobe-select-btn');
+  if(btn)btn.style.display='';
+  // Only re-render wardrobe if we're on that tab
+  if(document.getElementById('view-wardrobe')?.classList.contains('active'))renderWardrobe();
 }
 
 function toggleWardrobeSection(id,titleEl){
