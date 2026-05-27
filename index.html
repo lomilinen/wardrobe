@@ -129,6 +129,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
 .catfilter{display:flex;gap:4px;flex-wrap:wrap;}
 .catbtn{padding:6px 11px;border-radius:var(--rpill);border:1px solid var(--border);background:var(--warm);font-size:12px;color:var(--ink-muted);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s;}
 .catbtn.active{background:var(--ink);color:var(--warm);border-color:var(--ink);}
+.wdropdown{padding:6px 28px 6px 11px;border-radius:var(--rpill);border:1px solid var(--border);background:var(--warm);font-size:12px;color:var(--ink-soft);cursor:pointer;font-family:'DM Sans',sans-serif;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%236B6560' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;outline:none;transition:border-color .15s;}
+.wdropdown:focus{border-color:var(--border-mid);}
 .addbtn{padding:9px 16px;border-radius:var(--rsm);background:var(--sage);color:#fff;border:none;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;white-space:nowrap;}
 .addbtn:hover{background:var(--sage-dark);}
 .items-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
@@ -297,11 +299,32 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
 
   <!-- WARDROBE -->
   <div id="view-wardrobe" class="view">
-    <div class="wcontrols">
-      <div class="catfilter" id="cat-filter-btns"></div>
-    </div>
-    <div class="wcontrols" style="margin-top:-0.5rem;flex-wrap:wrap;gap:6px;">
-      <button class="catbtn" id="wardrobe-sort-btn" onclick="cycleWardrobeSort()">Least used</button>
+    <div class="wcontrols" style="gap:6px;flex-wrap:wrap;">
+      <select class="wdropdown" id="wardrobe-cat-select" onchange="onCatDropdownChange(this)">
+        <option value="all">All categories</option>
+        <option value="tops">Tops</option>
+        <option value="bottoms">Bottoms</option>
+        <option value="dresses">Dresses</option>
+        <option value="jumpers">Jumpers</option>
+        <option value="shoes">Shoes</option>
+        <option value="coats">Coats</option>
+        <option value="bags">Bags</option>
+        <option value="scarves">Scarves / Tights</option>
+        <option value="accessories">Accessories</option>
+      </select>
+      <select class="wdropdown" id="wardrobe-sort-select" onchange="onSortDropdownChange(this)">
+        <option value="">Default order</option>
+        <option value="least-worn">Least worn</option>
+        <option value="most-worn">Most worn</option>
+        <option value="least-outfits">Fewest outfits</option>
+        <option value="most-outfits">Most outfits</option>
+      </select>
+      <select class="wdropdown" id="wardrobe-type-select" onchange="onTypeDropdownChange(this)">
+        <option value="">All types</option>
+        <option value="everyday">Everyday</option>
+        <option value="occasion">🎉 Occasion</option>
+        <option value="unavailable">🚫 Unavailable</option>
+      </select>
       <button class="catbtn" id="wardrobe-weather-btn" onclick="toggleWardrobeWeatherPicker()">Weather <span id="wardrobe-weather-count"></span></button>
       <div id="wardrobe-weather-picker" style="display:none;position:fixed;background:var(--warm);border:1px solid var(--border);border-radius:var(--rsm);padding:10px;z-index:150;box-shadow:0 4px 16px rgba(0,0,0,.12);width:220px;">
         <div style="font-size:11px;color:var(--ink-faint);margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em;">Temperature</div>
@@ -317,15 +340,15 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
         </div>
         <button onclick="toggleWardrobeWeatherPicker()" style="width:100%;padding:6px;border-radius:var(--rsm);border:none;background:var(--ink);color:var(--warm);font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;">Done</button>
       </div>
-      <button class="catbtn" id="wardrobe-type-btn" onclick="cycleWardrobeType()">All types</button>
       <button class="addbtn" onclick="openAddModal()">+ Add</button>
       <button class="catbtn" id="wardrobe-select-btn" onclick="toggleWardrobeSelectMode()">Select</button>
     </div>
     <div id="items-grid"></div>
   </div>
   <div class="wardrobe-select-bar" id="wardrobe-select-bar">
-    <button class="wsbar-btn wsbar-unavail" onclick="bulkSetUnavailable(true)">🚫 Mark unavailable</button>
-    <button class="wsbar-btn wsbar-avail" onclick="bulkSetUnavailable(false)">✓ Mark available</button>
+    <span id="wardrobe-select-count" style="color:rgba(255,255,255,.6);font-size:12px;min-width:28px;"></span>
+    <button class="wsbar-btn wsbar-unavail" onclick="bulkSetUnavailable(true)">🚫 Unavailable</button>
+    <button class="wsbar-btn wsbar-avail" onclick="bulkSetUnavailable(false)">✓ Available</button>
     <button class="wsbar-btn wsbar-cancel" onclick="exitWardrobeSelectMode()">Cancel</button>
   </div>
 
@@ -593,6 +616,7 @@ let pairedPage_current=0,pairedMarkedForRemoval=new Set();
 let savingTimer=null;
 let editAccOutfitId=null,editAccState={};
 let wardrobeSelectMode=false,wardrobeSelected=new Set();
+let openWardrobeSection=null;
 let wardrobeWeatherFilters=new Set();
 let outfitsWeatherFilters=new Set();
 
@@ -614,16 +638,17 @@ const OUTFITS_TYPES=['','everyday','occasion','unavailable'];
 const OUTFITS_TYPE_LABELS=['All types','Everyday','🎉 Occasion','🚫 Unavailable'];
 let outfitsTypeIdx=1; // default Everyday
 
-function cycleWardrobeSort(){
-  wardrobeSortIdx=(wardrobeSortIdx+1)%WARDROBE_SORTS.length;
-  document.getElementById('wardrobe-sort-btn').textContent=WARDROBE_SORT_LABELS[wardrobeSortIdx];
-  document.getElementById('wardrobe-sort-btn').classList.toggle('active',wardrobeSortIdx>0);
+function onCatDropdownChange(sel){
+  currentCat=sel.value;
+  openWardrobeSection=null;
   renderWardrobe();
 }
-function cycleWardrobeType(){
-  wardrobeTypeIdx=(wardrobeTypeIdx+1)%WARDROBE_TYPES.length;
-  document.getElementById('wardrobe-type-btn').textContent=WARDROBE_TYPE_LABELS[wardrobeTypeIdx];
-  document.getElementById('wardrobe-type-btn').classList.toggle('active',wardrobeTypeIdx>0);
+function onSortDropdownChange(sel){
+  wardrobeSortIdx=Math.max(0,WARDROBE_SORTS.indexOf(sel.value));
+  renderWardrobe();
+}
+function onTypeDropdownChange(sel){
+  wardrobeTypeIdx=Math.max(0,WARDROBE_TYPES.indexOf(sel.value));
   renderWardrobe();
 }
 function cycleOutfitsSort(){
@@ -768,11 +793,7 @@ function normaliseDate(d){
   return s;
 }
 
-function buildCatFilterBtns(){
-  const div=document.getElementById('cat-filter-btns');
-  div.innerHTML=`<button class="catbtn active" onclick="filterCat(this,'all')">All</button>`+
-    Object.entries(CATS).map(([k,v])=>`<button class="catbtn" onclick="filterCat(this,'${k}')">${v.label}</button>`).join('');
-}
+function buildCatFilterBtns(){/* removed — replaced by dropdown */}
 
 // ===== TABS =====
 function switchTab(name,btn){
@@ -791,6 +812,7 @@ function switchTab(name,btn){
 function getItem(id){return items.find(i=>i.id===id);}
 function daysAgo(n){const d=new Date();d.setDate(d.getDate()-n);return d.toISOString();}
 function daysSince(iso){if(!iso)return 999;return Math.round((Date.now()-new Date(iso))/86400000);}
+function daysSinceLabel(iso){const d=daysSince(iso);if(d>=999)return'never worn';if(d===0)return'today';if(d===1)return'yesterday';return`${d}d ago`;}
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500);}
 function todayStr(){return new Date().toLocaleDateString('en-CA');}
 
@@ -1509,13 +1531,14 @@ function renderWardrobe(){
       let catItems=applySort(applyFilters(items.filter(i=>i.cat===cat)));
       if(!catItems.length)return;
       totalFound+=catItems.length;
+      const isOpen=openWardrobeSection===cat;
       html+=`<div style="margin-bottom:1.5rem;">
         <div class="accordion-header" onclick="toggleWardrobeSection('wsec-${cat}',this)">
           ${CATS[cat].label}
           <span class="acc-count-pill">${catItems.length}</span>
-          <span class="acc-arrow">▸</span>
+          <span class="acc-arrow">${isOpen?'▾':'▸'}</span>
         </div>
-        <div id="wsec-${cat}" class="items-grid" style="display:none;">${catItems.map(item=>itemCard(item)).join('')}</div>
+        <div id="wsec-${cat}" class="items-grid" style="display:${isOpen?'grid':'none'};">${catItems.map(item=>itemCard(item)).join('')}</div>
       </div>`;
     });
   }
@@ -1526,12 +1549,28 @@ function renderWardrobe(){
 
 // ITEM 6: 4 per row — done via CSS (.items-grid uses repeat(4,1fr))
 function itemCard(item){
+  if(wardrobeSelectMode){
+    const sel=wardrobeSelected.has(item.id);
+    return`<div class="icard${item.unavailable?' icard-unavailable':''}${sel?' icard-selected':''}" onclick="toggleWardrobeItemSelect('${item.id}')" style="position:relative;">
+      ${sel
+        ?`<div style="position:absolute;top:4px;right:4px;width:18px;height:18px;border-radius:50%;background:var(--sage);display:flex;align-items:center;justify-content:center;z-index:2;"><svg width='10' height='10' viewBox='0 0 10 10'><polyline points='1.5,5 4,7.5 8.5,2.5' stroke='%23fff' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg></div>`
+        :`<div style="position:absolute;top:4px;right:4px;width:18px;height:18px;border-radius:50%;border:2px solid var(--border-mid);background:var(--warm);z-index:2;"></div>`}
+      <div class="iimg">${item.img?`<img src="${item.img}" loading="lazy">`:`<span>${item.emoji||CATS[item.cat]?.emoji||'👕'}</span>`}</div>
+      <div class="imeta"><div class="iworn">${item.unavailable?'🚫 ':item.occasion?'🎉 ':''} ${item.wornCount||0}× · ${daysSinceLabel(item.lastWorn)}</div></div>
+    </div>`;
+  }
   return`<div class="icard${item.unavailable?' icard-unavailable':''}" onclick="openEditModal('${item.id}')">
     <div class="iimg">${item.img?`<img src="${item.img}" loading="lazy">`:`<span>${item.emoji||CATS[item.cat]?.emoji||'👕'}</span>`}</div>
-    <div class="imeta">
-      <div class="iworn">${item.unavailable?'🚫 ':item.occasion?'🎉 ':''} ${item.wornCount||0}× · ${daysSince(item.lastWorn)}d ago</div>
-    </div>
+    <div class="imeta"><div class="iworn">${item.unavailable?'🚫 ':item.occasion?'🎉 ':''} ${item.wornCount||0}× · ${daysSinceLabel(item.lastWorn)}</div></div>
   </div>`;
+}
+
+function toggleWardrobeItemSelect(id){
+  if(wardrobeSelected.has(id))wardrobeSelected.delete(id);
+  else wardrobeSelected.add(id);
+  const countEl=document.getElementById('wardrobe-select-count');
+  if(countEl)countEl.textContent=wardrobeSelected.size?`(${wardrobeSelected.size})`:'';
+  renderWardrobe();
 }
 
 function toggleWardrobeWeatherPicker(){
@@ -1637,8 +1676,23 @@ function exitWardrobeSelectMode(){
   if(bar)bar.classList.remove('open');
   const btn=document.getElementById('wardrobe-select-btn');
   if(btn)btn.style.display='';
-  // Only re-render wardrobe if we're on that tab
+  const countEl=document.getElementById('wardrobe-select-count');
+  if(countEl)countEl.textContent='';
   if(document.getElementById('view-wardrobe')?.classList.contains('active'))renderWardrobe();
+}
+
+async function bulkSetUnavailable(makeUnavailable){
+  if(!wardrobeSelected.size)return;
+  const ids=[...wardrobeSelected];
+  ids.forEach(id=>{const item=items.find(i=>i.id===id);if(item)item.unavailable=makeUnavailable;});
+  exitWardrobeSelectMode();
+  showSaving();
+  for(const id of ids){
+    const item=items.find(i=>i.id===id);
+    if(!item)continue;
+    try{await fetch(API,{method:'POST',body:JSON.stringify({action:'updateItem',item})});}
+    catch(e){console.error('bulkSetUnavailable',e);}
+  }
 }
 
 function toggleWardrobeSection(id,titleEl){
@@ -1647,7 +1701,13 @@ function toggleWardrobeSection(id,titleEl){
   const isOpen=body.style.display!=='none';
   document.querySelectorAll('[id^="wsec-"]').forEach(b=>b.style.display='none');
   document.querySelectorAll('.accordion-header .acc-arrow').forEach(a=>a.textContent='▸');
-  if(!isOpen){body.style.display='grid';arrow.textContent='▾';}
+  if(!isOpen){
+    body.style.display='grid';
+    arrow.textContent='▾';
+    openWardrobeSection=id.replace('wsec-','');
+  } else {
+    openWardrobeSection=null;
+  }
 }
 
 function filterCat(btn,cat){
