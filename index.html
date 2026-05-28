@@ -707,7 +707,7 @@ function showSaving(){
 // ===== WEATHER =====
 async function loadWeather(){
   try{
-    const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&current=temperature_2m,weathercode&daily=weathercode&hourly=temperature_2m&timezone=America%2FLos_Angeles&forecast_days=10`);
+    const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&current=temperature_2m,weathercode&daily=weathercode&hourly=temperature_2m,weathercode&timezone=America%2FLos_Angeles&forecast_days=10`);
     const d=await r.json();
     const tempC=Math.round(d.current.temperature_2m);
     const code=d.current.weathercode;
@@ -719,18 +719,28 @@ async function loadWeather(){
       },[]);
       return hours.length?Math.round(hours.reduce((s,v)=>s+v,0)/hours.length):null;
     }
+    function dayWorstCondition(dateStr){
+      const codes=d.hourly.time.reduce((acc,t,i)=>{
+        if(t.startsWith(dateStr)){const h=parseInt(t.slice(11,13));if(h>=8&&h<=20)acc.push(d.hourly.weathercode[i]);}
+        return acc;
+      },[]);
+      const worst=codes.length?Math.max(...codes):0;
+      return{condition:wmoToCondition(worst),icon:wmoToIcon(worst),label:wmoToLabel(worst)};
+    }
     forecast=d.daily.time.map((date,i)=>({
       date,tempC:dayAvgTemp(date)??Math.round(d.hourly.temperature_2m[i*24]||0),
-      condition:wmoToCondition(d.daily.weathercode[i]),
-      icon:wmoToIcon(d.daily.weathercode[i]),
-      label:wmoToLabel(d.daily.weathercode[i])
+      ...dayWorstCondition(date)
     }));
-    document.getElementById('wpill-txt').innerHTML=`Seattle · ${weather.icon} ${weather.label}<br>${formatTemp(tempC)}`;
+    const todayStr=new Date().toLocaleDateString('en-CA');
+    const todayAvg=dayAvgTemp(todayStr)??tempC;
+    const todayWorst=dayWorstCondition(todayStr);
+    weather.tempC=todayAvg;weather.condition=todayWorst.condition;weather.label=todayWorst.label;weather.icon=todayWorst.icon;
+    document.getElementById('wpill-txt').innerHTML=`Seattle · ${weather.icon} ${weather.label}<br>avg. ${formatTemp(weather.tempC)}`;
   }catch(e){
     document.getElementById('wpill-txt').innerHTML='Weather unavailable';
   }
 }
-function wmoToCondition(c){if(c>=51)return'rainy';return'';}
+function wmoToCondition(c){if(c>=55)return'rainy';return '';}
 function wmoToIcon(c){if(c<=1)return'☀️';if(c<=3)return'☁️';if(c>=51)return'🌧️';return'☁️';}
 function wmoToLabel(c){
   if(c===0)return'Clear sky';if(c<=2)return'Partly cloudy';if(c<=3)return'Overcast';
@@ -2668,7 +2678,7 @@ function openDayDetail(dateStr,isFuture){
 
   // ITEM 3: Multiple logged outfits side by side
   if(logs.length){
-    const weatherText=(!isFuture&&logs[0].weatherLabel)?`${logs[0].weatherLabel} · ${formatTemp(logs[0].tempC)}`:(isFuture&&fcast?`${fcast.icon} ${fcast.label} · ${formatTemp(fcast.tempC)}`:'');
+    const weatherText=(!isFuture&&logs[0].weatherLabel)?`${logs[0].weatherLabel} · ${formatTemp(logs[0].tempC)}`:(isFuture&&fcast?`${fcast.icon} ${fcast.label} · avg. ${formatTemp(fcast.tempC)}`:'');
     document.getElementById('sheet-weather').textContent=weatherText;
     const row=document.createElement('div');
     row.className='logged-outfits-row';
@@ -2701,7 +2711,7 @@ function openDayDetail(dateStr,isFuture){
     });
     content.appendChild(row);
   } else {
-    document.getElementById('sheet-weather').textContent=isFuture&&fcast?`${fcast.icon} ${fcast.label} · ${formatTemp(fcast.tempC)}`:'';
+    document.getElementById('sheet-weather').textContent=isFuture&&fcast?`${fcast.icon} ${fcast.label} · avg. ${formatTemp(fcast.tempC)}`:'';
   }
 
   // Suggestions — show for today and future only (not past)
