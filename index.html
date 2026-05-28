@@ -749,7 +749,6 @@ function previewImg(val){
 async function init(){
   const today=new Date();
   calYear=today.getFullYear();calMonth=today.getMonth();
-  buildCatFilterBtns();
   renderCalendar(); // render empty structure immediately
 
   // Fire all fetches simultaneously — don't let weather block data
@@ -817,11 +816,6 @@ function normaliseDate(d){
   return s;
 }
 
-function buildCatFilterBtns(){
-  const div=document.getElementById('cat-filter-btns');
-  div.innerHTML=`<button class="catbtn active" onclick="filterCat(this,'all')">All</button>`+
-    Object.entries(CATS).map(([k,v])=>`<button class="catbtn" onclick="filterCat(this,'${k}')">${v.label}</button>`).join('');
-}
 
 // ===== TABS =====
 function switchTab(name,btn){
