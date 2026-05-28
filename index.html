@@ -543,11 +543,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
       <hr class="divider">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
         <div class="sec-label" style="margin-bottom:0;">Paired in outfits</div>
-        <button class="page-btn" id="paired-bulk-btn" onclick="togglePairedBulkMode()" style="font-size:10px;">Select</button>
       </div>
-      <div class="fhint" style="margin-bottom:10px;">Tap an outfit to unlink this item from it. Changes apply on Save.</div>
+      <div class="fhint" style="margin-bottom:10px;">Tap outfits to select them, then unlink.</div>
       <div id="paired-bulk-delete-bar" style="display:none;margin-bottom:8px;">
-        <button class="btn-danger" style="font-size:11px;padding:6px 12px;width:100%;" onclick="bulkDeletePairedOutfits()">Unlink selected outfits</button>
+        <button class="btn-danger" id="paired-unlink-btn" style="font-size:11px;padding:6px 12px;width:100%;" onclick="bulkDeletePairedOutfits()">Unlink selected outfits</button>
       </div>
       <div id="paired-outfits-list"></div>
       <div class="paired-pagination" id="paired-pagination" style="display:none;">
@@ -1371,13 +1370,18 @@ function openLinkOutfits(newItemId){
       saveBtn.disabled=true;
       saveBtn.textContent=`Saving… 0 / ${toUpdate.length}`;
       let saved=0;
-      for(const o of toUpdate){
-        if(!o.accByCat[item.cat])o.accByCat[item.cat]=[];
-        if(!o.accByCat[item.cat].includes(newItemId))o.accByCat[item.cat].push(newItemId);
-        o.accessories=Object.values(o.accByCat).flat();
-        await apiCall({action:'updateOutfit',data:{...o,accByCat:JSON.stringify(o.accByCat)}});
-        saved++;
+      const batchSize=10;
+      for(let i=0;i<toUpdate.length;i+=batchSize){
+        const batch=toUpdate.slice(i,i+batchSize);
+        await Promise.all(batch.map(o=>{
+          if(!o.accByCat[item.cat])o.accByCat[item.cat]=[];
+          if(!o.accByCat[item.cat].includes(newItemId))o.accByCat[item.cat].push(newItemId);
+          o.accessories=Object.values(o.accByCat).flat();
+          return apiCall({action:'updateOutfit',data:{...o,accByCat:JSON.stringify(o.accByCat)}});
+        }));
+        saved+=batch.length;
         saveBtn.textContent=`Saving… ${saved} / ${toUpdate.length}`;
+        if(i+batchSize<toUpdate.length)await new Promise(r=>setTimeout(r,300));
       }
       showToast(`Linked to ${toUpdate.length} outfit${toUpdate.length!==1?'s':''}!`);
       saveBtn.disabled=false;
@@ -1864,26 +1868,38 @@ function filterCat(btn,cat){
 // ===== ITEM MODAL — ITEM 7: paired-in for ALL categories =====
 let pairedOutfitsForModal=[];
 const PAIRED_PER_PAGE=12;
-let pairedBulkMode=false;
+let pairedBulkMode=true;
 let pairedBulkSelected=new Set();
 
 function togglePairedBulkMode(){
-  pairedBulkMode=!pairedBulkMode;
-  pairedBulkSelected=new Set();
-  document.getElementById('paired-bulk-btn').textContent=pairedBulkMode?'Cancel':'Select';
-  document.getElementById('paired-bulk-delete-bar').style.display=pairedBulkMode?'block':'none';
-  // Change 2: do NOT reset page when toggling select mode
-  renderPairedOutfits();
+  // No-op — always in bulk mode now
 }
 
-function bulkDeletePairedOutfits(){
-  if(!pairedBulkSelected.size)return;
-  pairedBulkSelected.forEach(id=>pairedMarkedForRemoval.add(id));
-  pairedBulkMode=false;
+async function bulkDeletePairedOutfits(){
+  if(!pairedBulkSelected.size){showToast('Select at least one outfit first');return;}
+  const btn=document.getElementById('paired-unlink-btn');
+  if(btn){btn.disabled=true;btn.textContent='Unlinking...';}
+  const ids=[...pairedBulkSelected];
+  const item=items.find(i=>i.id===editingItemId);
+  const outfitsToUpdate=[];
+  ids.forEach(outfitId=>{
+    const o=outfits.find(x=>x.id===outfitId);
+    if(!o)return;
+    if(item&&ACC_CATS.includes(item.cat)){
+      ACC_CATS.forEach(c=>{if(o.accByCat[c])o.accByCat[c]=o.accByCat[c].filter(a=>a!==editingItemId);});
+      o.accessories=Object.values(o.accByCat).flat();
+    }
+    outfitsToUpdate.push(o);
+  });
+  pairedOutfitsForModal=pairedOutfitsForModal.filter(o=>!ids.includes(o.id));
   pairedBulkSelected=new Set();
-  document.getElementById('paired-bulk-btn').textContent='Select';
-  document.getElementById('paired-bulk-delete-bar').style.display='none';
   renderPairedOutfits();
+  showSaving();
+  for(const o of outfitsToUpdate){
+    await apiCall({action:'updateOutfit',data:{...o,accByCat:JSON.stringify(o.accByCat)}});
+  }
+  if(btn){btn.disabled=false;btn.textContent='Unlink selected outfits';}
+  showToast(`${ids.length} outfit${ids.length>1?'s':''} unlinked`);
 }
 
 function openAddModal(){
@@ -1952,18 +1968,13 @@ function openEditModal(id){
     pairedSec.style.display='block';
     // Change 1: different hint and behaviour for core vs acc
     const hintEl=document.querySelector('#paired-outfits-section .fhint');
-    const bulkBtn=document.getElementById('paired-bulk-btn');
     if(isCore){
       if(hintEl)hintEl.textContent='Tap an outfit to delete it permanently.';
-      bulkBtn.style.display='none';
     } else {
-      if(hintEl)hintEl.textContent='Tap an outfit to unlink this item from it. Changes apply on Save.';
-      bulkBtn.style.display='block';
+      if(hintEl)hintEl.textContent='Tap outfits to select them, then unlink.';
     }
-    pairedBulkMode=false;
     pairedBulkSelected=new Set();
     document.getElementById('paired-bulk-delete-bar').style.display='none';
-    bulkBtn.textContent='Select';
     renderPairedOutfits();
   } else {
     pairedSec.style.display='none';
@@ -1994,16 +2005,13 @@ function renderPairedOutfits(){
     let clickAction;
     if(isCore){
       clickAction=`deletePairedOutfit('${o.id}')`;
-    } else if(pairedBulkMode){
-      clickAction=`togglePairedBulkSelect('${o.id}')`;
     } else {
-      clickAction=`togglePairedRemove('${o.id}')`;
+      clickAction=`togglePairedBulkSelect('${o.id}')`;
     }
-    return`<div class="paired-outfit-card${isMarked?' marked-remove':''}${isBulkSel?' outfit-card-selected':''}" onclick="${clickAction}">
+    return`<div class="paired-outfit-card${isBulkSel?' outfit-card-selected':''}" onclick="${clickAction}">
       ${flHtml||'<div style="height:40px;display:flex;align-items:center;justify-content:center;font-size:18px;">👗</div>'}
-      ${isMarked?'<div class="paired-remove-badge">Unlink</div>':''}
       ${isBulkSel?'<div class="paired-remove-badge" style="background:var(--sage);">✓</div>':''}
-      ${!pairedBulkMode?`<button class="paired-outfit-open-btn" onclick="event.stopPropagation();openOutfitFromItem('${o.id}')">Open</button>`:''}
+      <button class="paired-outfit-open-btn" onclick="event.stopPropagation();openOutfitFromItem('${o.id}')">Open</button>
     </div>`;
   }).join('')}</div>`;
 
@@ -2022,6 +2030,7 @@ function renderPairedOutfits(){
 function togglePairedBulkSelect(outfitId){
   if(pairedBulkSelected.has(outfitId))pairedBulkSelected.delete(outfitId);
   else pairedBulkSelected.add(outfitId);
+  document.getElementById('paired-bulk-delete-bar').style.display=pairedBulkSelected.size?'block':'none';
   renderPairedOutfits();
 }
 
@@ -2116,8 +2125,7 @@ async function saveItemModal(){
     const name=`${CATS[cat].label} ${items.filter(i=>i.cat===cat).length+1}`;
     const newItem={id:'i'+Date.now(),name,cat,emoji:CATS[cat].emoji,img,seasons,conditions,occasion,unavailable,wornCount:0,lastWorn:''};
     items.push(newItem);
-    closeItemModal();showSaving();
-    await apiCall({action:'saveItem',data:newItem});
+    closeItemModal();
     if(CORE_CATS.includes(cat)){
       openCurateScreen(newItem.id);
     } else if(ACC_CATS.includes(cat)){
@@ -2125,6 +2133,8 @@ async function saveItemModal(){
     } else {
       renderWardrobe();showToast('Item added!');
     }
+    showSaving();
+    await apiCall({action:'saveItem',data:newItem});
   }
 }
 
@@ -2348,6 +2358,18 @@ async function curateNext(){
 }
 
 function curateSkip(){
+  // If this step was meant to complete a pair (pairPieces exists),
+  // remove any outfit already saved with just those pieces
+  const step=curateSteps[curateStepIdx];
+  if(step&&step.pairPieces&&step.pairPieces.length){
+    const key=[...step.pairPieces].sort().join('|');
+    const toDelete=curateSavedOutfits.filter(o=>[...(o.pieces||[])].sort().join('|')===key);
+    toDelete.forEach(o=>{
+      curateSavedOutfits=curateSavedOutfits.filter(x=>x.id!==o.id);
+      outfits=outfits.filter(x=>x.id!==o.id);
+      apiCall({action:'deleteOutfit',id:o.id});
+    });
+  }
   curateStepIdx++;
   if(curateStepIdx>=curateSteps.length){
     if(curateSavedOutfits.length)showSaving();
