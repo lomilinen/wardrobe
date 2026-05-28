@@ -24,9 +24,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
 
 /* HEADER */
 .header{display:flex;align-items:center;justify-content:space-between;margin-bottom:0.6rem;padding-bottom:0.5rem;border-bottom:1px solid var(--border);}
-.logo{font-family:'Cormorant Garamond',serif;font-size:26px;font-weight:400;}
+.logo{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:400;}
 .logo em{font-style:italic;color:var(--ink-muted);}
-.wpill{display:flex;align-items:center;gap:6px;background:var(--warm);border:1px solid var(--border);border-radius:var(--rpill);padding:5px 13px;font-size:12px;color:var(--ink-soft);max-width:220px;}
+.wpill{display:flex;align-items:center;gap:6px;background:var(--warm);border:1px solid var(--border);border-radius:var(--rpill);padding:5px 13px;font-size:12px;color:var(--ink-soft);}
 .wpill-txt{white-space:normal;line-height:1.4;}
 .wdot{width:6px;height:6px;border-radius:50%;background:var(--sage);flex-shrink:0;}
 
@@ -725,9 +725,9 @@ async function loadWeather(){
       icon:wmoToIcon(d.daily.weathercode[i]),
       label:wmoToLabel(d.daily.weathercode[i])
     }));
-    document.getElementById('wpill-txt').textContent=`${weather.icon} ${weather.label} · ${formatTemp(tempC)}`;
+    document.getElementById('wpill-txt').innerHTML=`Seattle · ${weather.icon} ${weather.label}<br>${formatTemp(tempC)}`;
   }catch(e){
-    document.getElementById('wpill-txt').textContent='Weather unavailable';
+    document.getElementById('wpill-txt').innerHTML='Weather unavailable';
   }
 }
 function wmoToCondition(c){if(c>=51)return'rainy';return'';}
