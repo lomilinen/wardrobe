@@ -2680,7 +2680,7 @@ function openDayDetail(dateStr,isFuture){
 
   // ITEM 3: Multiple logged outfits side by side
   if(logs.length){
-    const weatherText=(!isFuture&&logs[0].weatherLabel)?`${logs[0].weatherLabel} · ${formatTemp(logs[0].tempC)}`:(isFuture&&fcast?`${fcast.icon} ${fcast.label} · avg. ${formatTemp(fcast.tempC)}`:'');
+    const weatherText=(!isFuture&&!isToday&&logs[0].weatherLabel)?`${logs[0].weatherLabel} · ${formatTemp(logs[0].tempC)}`:((isFuture||isToday)&&fcast?`${fcast.icon} ${fcast.label} · avg. ${formatTemp(fcast.tempC)}`:'');
     document.getElementById('sheet-weather').textContent=weatherText;
     const row=document.createElement('div');
     row.className='logged-outfits-row';
@@ -2713,7 +2713,7 @@ function openDayDetail(dateStr,isFuture){
     });
     content.appendChild(row);
   } else {
-    document.getElementById('sheet-weather').textContent=isFuture&&fcast?`${fcast.icon} ${fcast.label} · avg. ${formatTemp(fcast.tempC)}`:'';
+    document.getElementById('sheet-weather').textContent=(isFuture||isToday)&&fcast?`${fcast.icon} ${fcast.label} · avg. ${formatTemp(fcast.tempC)}`:'';
   }
 
   // Suggestions — show for today and future only (not past)
