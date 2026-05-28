@@ -610,15 +610,15 @@ const OCCASION_CATS=['tops','jumpers','bottoms','dresses','shoes','bags'];
 const SEASON_RANGES={
   freezing:{min:-99,max:5},
   cold:{min:5,max:13},
-  mild:{min:13,max:23},
-  warm:{min:23,max:99}
+  mild:{min:13,max:20},
+  warm:{min:20,max:99}
 };
 function cToF(c){return Math.round(c*9/5+32);}
 function seasonLabel(c){
   if(c===null||c===undefined)return'';
   if(c<5)return'Freezing';
   if(c<13)return'Cold';
-  if(c<23)return'Mild';
+  if(c<20)return'Mild';
   return'Warm';
 }
 function formatTemp(c){return`${c}°C / ${cToF(c)}°F · ${seasonLabel(c)}`;}
@@ -2493,7 +2493,7 @@ function renderCalendar(){
         thumbsHtml=buildFlatlay(tempId,true);
         outfits=outfits.filter(x=>x.id!==tempId);
       }
-    } else if(isFuture&&fcast){
+    } else if((isFuture||isToday)&&fcast){
       thumbsHtml=`<div style="font-size:14px;margin-top:2px;">${fcast.icon}</div>`;
     }
     const cls=['cal-day',isToday?'today':''].filter(Boolean).join(' ');
