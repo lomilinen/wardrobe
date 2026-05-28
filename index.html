@@ -1275,6 +1275,7 @@ async function confirmWornFromDetail(){
   const allWorn=[...o.pieces,...chosenAccs];
   allWorn.forEach(pid=>{const it=getItem(pid);if(it){it.lastWorn=new Date().toISOString();it.wornCount=(it.wornCount||0)+1;}});
   wornLogs.push(log);
+  suggestionPages={};suggestionPageIndex={};
   closeDatePickScreen();
   closeOutfitDetail();
   renderCalendar();
@@ -1514,6 +1515,7 @@ async function confirmWorn(){
   const allWorn=[...o.pieces,...chosenAccs];
   allWorn.forEach(pid=>{const it=getItem(pid);if(it){it.lastWorn=new Date().toISOString();it.wornCount=(it.wornCount||0)+1;}});
   wornLogs.push(log);
+  suggestionPages={};suggestionPageIndex={};
   closeWearing();
   renderCalendar();
   showSaving();
