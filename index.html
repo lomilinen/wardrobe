@@ -20,18 +20,18 @@
 }
 html{height:100%;}
 body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);min-height:100%;font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;}
-.app{max-width:860px;margin:0 auto;padding:0.75rem 1.25rem 6rem;}
+.app{max-width:860px;margin:0 auto;padding:0.4rem 1.25rem 6rem;}
 
 /* HEADER */
-.header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;padding-bottom:0.75rem;border-bottom:1px solid var(--border);}
+.header{display:flex;align-items:center;justify-content:space-between;margin-bottom:0.6rem;padding-bottom:0.5rem;border-bottom:1px solid var(--border);}
 .logo{font-family:'Cormorant Garamond',serif;font-size:26px;font-weight:400;}
 .logo em{font-style:italic;color:var(--ink-muted);}
 .wpill{display:flex;align-items:center;gap:6px;background:var(--warm);border:1px solid var(--border);border-radius:var(--rpill);padding:5px 13px;font-size:12px;color:var(--ink-soft);}
 .wdot{width:6px;height:6px;border-radius:50%;background:var(--sage);flex-shrink:0;}
 
 /* TABS */
-.tabs{display:flex;gap:3px;background:var(--warm);border:1px solid var(--border);border-radius:var(--r);padding:3px;margin-bottom:1rem;}
-.tab{flex:1;padding:7px 2px;border-radius:var(--rsm);font-size:11px;color:var(--ink-muted);cursor:pointer;border:none;background:none;font-family:'DM Sans',sans-serif;transition:all .15s;text-align:center;}
+.tabs{display:flex;gap:3px;background:var(--warm);border:1px solid var(--border);border-radius:var(--r);padding:3px;margin-bottom:0.6rem;}
+.tab{flex:1;padding:6px 2px;border-radius:var(--rsm);font-size:11px;color:var(--ink-muted);cursor:pointer;border:none;background:none;font-family:'DM Sans',sans-serif;transition:all .15s;text-align:center;}
 .tab.active{background:var(--ink);color:var(--warm);font-weight:500;}
 .tab:hover:not(.active){color:var(--ink);background:var(--cream);}
 .view{display:none;}.view.active{display:block;}
@@ -179,7 +179,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
 .save-btn:disabled{opacity:.35;cursor:not-allowed;}
 
 /* CALENDAR */
-.cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;}
+.cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;}
 .cal-nav-btn{background:none;border:1px solid var(--border);border-radius:var(--rsm);padding:6px 12px;cursor:pointer;font-size:14px;color:var(--ink-soft);font-family:'DM Sans',sans-serif;}
 .cal-month{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:400;}
 .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;}
