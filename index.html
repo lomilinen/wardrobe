@@ -357,9 +357,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
   <div id="view-outfits" class="view">
     <div class="outfits-controls" style="flex-wrap:wrap;gap:6px;">
       <select class="wdropdown" id="outfits-sort-select" onchange="onOutfitsSortChange(this)">
-        <option value="">Default order</option>
-        <option value="least-worn">Least worn</option>
-        <option value="most-worn">Most worn</option>
+        <option value="least">Least worn</option>
+        <option value="most">Most worn</option>
+        <option value="newest">Newest</option>
+        <option value="oldest">Oldest</option>
       </select>
       <select class="wdropdown" id="outfits-type-select" onchange="onOutfitsTypeChange(this)">
         <option value="everyday">Everyday</option>
@@ -382,7 +383,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
         <button onclick="toggleOutfitsWeatherPicker()" style="width:100%;padding:6px;border-radius:var(--rsm);border:none;background:var(--ink);color:var(--warm);font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;">Done</button>
       </div>
       <div id="outfits-bulk-controls" style="display:none;margin-left:auto;">
-        <button class="btn-danger" style="font-size:12px;padding:7px 12px;" onclick="bulkDeleteOutfits()">Delete selected</button>
+        <button class="btn-danger" id="outfits-bulk-delete-btn" style="font-size:12px;padding:7px 12px;" onclick="bulkDeleteOutfits()">Delete selected</button>
       </div>
       <button class="catbtn" id="outfits-select-btn" onclick="toggleOutfitSelectMode()" style="margin-left:auto;">Select</button>
     </div>
@@ -574,6 +575,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
     <div class="curate-context" id="curate-context" style="display:none;"></div>
     <div class="curate-dots" id="curate-dots"></div>
     <div class="curate-grid" id="curate-grid"></div>
+    <div id="curate-saving-txt" style="font-size:11px;color:var(--ink-faint);text-align:center;min-height:16px;margin-bottom:4px;"></div>
     <div class="curate-actions">
       <button class="curate-skip-btn" onclick="curateSkip()">Skip</button>
       <button class="curate-next-btn" id="curate-next-btn" onclick="curateNext()">Next →</button>
@@ -1091,6 +1093,8 @@ async function bulkDeleteOutfits(){
   if(!outfitSelected.size)return;
   if(!confirm(`Delete ${outfitSelected.size} outfit${outfitSelected.size>1?'s':''}?`))return;
   const ids=[...outfitSelected];
+  const bulkBtn=document.getElementById('outfits-bulk-delete-btn');
+  if(bulkBtn){bulkBtn.disabled=true;bulkBtn.textContent='Deleting...';}
   outfits=outfits.filter(o=>!ids.includes(o.id));
   outfitSelected=new Set();
   outfitSelectMode=false;
@@ -1100,6 +1104,7 @@ async function bulkDeleteOutfits(){
   renderOutfits();
   showSaving();
   await Promise.all(ids.map(id=>apiCall({action:'deleteOutfit',id})));
+  if(bulkBtn){bulkBtn.disabled=false;bulkBtn.textContent='Delete';}
   showToast(`${ids.length} outfit${ids.length>1?'s':''} deleted`);
 }
 
@@ -1294,67 +1299,92 @@ function closeEditAcc(){
   editAccOutfitId=null;editAccState={};editingLogId=null;
 }
 function openLinkOutfits(newItemId){
-  // Opens the edit-acc-screen in "link outfits" mode for a newly added accessory
-  // Shows all outfits so user can link the new item to them
   const item=getItem(newItemId);
   if(!item)return;
   editAccOutfitId=null;
   editAccState={};
+  const selectedItemIds=new Set();
   const content=document.getElementById('edit-acc-content');
   content.innerHTML='';
   const title=document.querySelector('.edit-acc-title');
-  if(title)title.textContent=`Link ${CATS[item.cat]?.label||'item'} to outfits`;
-  // Show all outfits as selectable — user taps to link this accessory
-  const allOutfits=outfits.filter(o=>o.id!=='__preview__');
-  if(!allOutfits.length){
-    content.innerHTML='<div class="empty-state">No outfits yet. Build some outfits first.</div>';
-  } else {
-    const hint=document.createElement('div');
-    hint.style.cssText='font-size:13px;color:var(--ink-muted);margin-bottom:1rem;';
-    hint.textContent='Tap outfits to link this item to them.';
-    content.appendChild(hint);
+  if(title)title.textContent=`Which items does this ${CATS[item.cat]?.label||'item'} go with?`;
+
+  const hint=document.createElement('div');
+  hint.style.cssText='font-size:13px;color:var(--ink-muted);margin-bottom:1.25rem;line-height:1.5;';
+  hint.textContent='Select the items this goes with. It will be linked to all outfits containing any of them.';
+  content.appendChild(hint);
+
+  // Build accordion per core category
+  CORE_CATS.forEach(cat=>{
+    const catItems=items.filter(i=>i.cat===cat&&i.id!==newItemId);
+    if(!catItems.length)return;
+    const section=document.createElement('div');
+    section.className='acc-edit-cat';
+    section.style.marginBottom='12px';
+    const header=document.createElement('div');
+    header.className='acc-edit-cat-header';
+    header.style.cssText='cursor:pointer;display:flex;align-items:center;justify-content:space-between;padding:8px 0;';
+    header.innerHTML=`${CATS[cat].label} <span class="acc-count-pill" id="link-count-${cat}">0 selected</span> <span class="acc-arrow" id="link-arrow-${cat}">▸</span>`;
     const grid=document.createElement('div');
-    grid.style.cssText='display:grid;grid-template-columns:repeat(3,1fr);gap:8px;';
-    const linkedOutfitIds=new Set();
-    allOutfits.forEach(o=>{
+    grid.className='acc-edit-options';
+    grid.id=`link-cat-${cat}`;
+    grid.style.display='none';
+    grid.style.cssText='display:none;grid-template-columns:repeat(4,1fr);gap:8px;padding:8px 0;';
+    catItems.forEach(it=>{
       const card=document.createElement('div');
-      card.style.cssText='border-radius:var(--rsm);border:2px solid var(--border);overflow:hidden;cursor:pointer;';
-      card.id=`link-outfit-${o.id}`;
-      card.innerHTML=buildFlatlayCore(o.id);
+      card.className='acc-edit-item';
+      card.id=`link-item-${it.id}`;
+      card.style.cssText='border-radius:var(--rsm);border:2px solid var(--border);overflow:hidden;cursor:pointer;aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;background:var(--warm);';
+      card.innerHTML=it.img?`<img src="${it.img}" style="width:100%;height:100%;object-fit:contain;" loading="lazy">`:`<span style="font-size:24px;">${it.emoji||'👕'}</span>`;
       card.onclick=()=>{
-        if(linkedOutfitIds.has(o.id)){
-          linkedOutfitIds.delete(o.id);
+        if(selectedItemIds.has(it.id)){
+          selectedItemIds.delete(it.id);
           card.style.borderColor='var(--border)';
-          const cat=item.cat;
-          o.accByCat[cat]=(o.accByCat[cat]||[]).filter(id=>id!==newItemId);
-          o.accessories=Object.values(o.accByCat).flat();
         } else {
-          linkedOutfitIds.add(o.id);
+          selectedItemIds.add(it.id);
           card.style.borderColor='var(--sage)';
-          const cat=item.cat;
-          if(!o.accByCat[cat])o.accByCat[cat]=[];
-          if(!o.accByCat[cat].includes(newItemId))o.accByCat[cat].push(newItemId);
-          o.accessories=Object.values(o.accByCat).flat();
         }
+        const count=catItems.filter(i=>selectedItemIds.has(i.id)).length;
+        document.getElementById(`link-count-${cat}`).textContent=`${count} selected`;
       };
       grid.appendChild(card);
     });
-    content.appendChild(grid);
-  }
-  // Override save button to save all linked outfits sequentially
+    header.onclick=()=>{
+      const isOpen=grid.style.display!=='none';
+      grid.style.display=isOpen?'none':'grid';
+      document.getElementById(`link-arrow-${cat}`).textContent=isOpen?'▸':'▾';
+    };
+    section.appendChild(header);
+    section.appendChild(grid);
+    content.appendChild(section);
+  });
+
+  // Override save button
   const saveBtn=document.querySelector('.acc-edit-save-btn');
   if(saveBtn){
+    saveBtn.disabled=false;
+    saveBtn.textContent='Save';
     saveBtn.onclick=async()=>{
-      const toSave=outfits.filter(o=>o.accessories&&o.accessories.includes(newItemId));
-      if(toSave.length){
-        showSaving();
-        for(const o of toSave){
-          await apiCall({action:'updateOutfit',data:{...o,accByCat:JSON.stringify(o.accByCat)}});
-        }
-        showToast(`Linked to ${toSave.length} outfit${toSave.length>1?'s':''}!`);
+      if(!selectedItemIds.size){showToast('Select at least one item to link');return;}
+      // Find all outfits containing any selected item
+      const toUpdate=outfits.filter(o=>o.id!=='__preview__'&&(o.pieces||[]).some(pid=>selectedItemIds.has(pid)));
+      saveBtn.disabled=true;
+      saveBtn.textContent=`Saving… 0 / ${toUpdate.length}`;
+      let saved=0;
+      for(const o of toUpdate){
+        if(!o.accByCat[item.cat])o.accByCat[item.cat]=[];
+        if(!o.accByCat[item.cat].includes(newItemId))o.accByCat[item.cat].push(newItemId);
+        o.accessories=Object.values(o.accByCat).flat();
+        await apiCall({action:'updateOutfit',data:{...o,accByCat:JSON.stringify(o.accByCat)}});
+        saved++;
+        saveBtn.textContent=`Saving… ${saved} / ${toUpdate.length}`;
       }
+      showToast(`Linked to ${toUpdate.length} outfit${toUpdate.length!==1?'s':''}!`);
+      saveBtn.disabled=false;
+      saveBtn.textContent='Save';
+      saveBtn.onclick=()=>editingLogId?saveEditAccForLog():saveEditAcc();
+      renderWardrobe();
       closeEditAcc();
-      if(saveBtn)saveBtn.onclick=()=>editingLogId?saveEditAccForLog():saveEditAcc();
     };
   }
   document.getElementById('edit-acc-screen').classList.add('open');
@@ -1424,6 +1454,8 @@ function toggleEditAcc(cat,itemId){
 async function saveEditAcc(){
   const o=outfits.find(x=>x.id===editAccOutfitId);
   if(!o)return;
+  const saveBtn=document.querySelector('.acc-edit-save-btn');
+  if(saveBtn){saveBtn.disabled=true;saveBtn.textContent='Saving...';}
   ACC_CATS.forEach(cat=>{o.accByCat[cat]=editAccState[cat]||[];});
   o.accessories=Object.values(o.accByCat).flat();
   document.getElementById('outfit-detail-flatlay').innerHTML=buildFlatlayCore(editAccOutfitId);
@@ -1455,6 +1487,7 @@ async function saveEditAcc(){
   closeEditAcc();
   showSaving();
   await apiCall({action:'updateOutfit',data:{...o,accByCat:JSON.stringify(o.accByCat)}});
+  if(saveBtn){saveBtn.disabled=false;saveBtn.textContent='Save';}
   showToast('Accessories saved');
 }
 
@@ -2049,6 +2082,8 @@ async function saveItemModal(){
     if(g==='season')seasons.push(v);
     if(g==='condition')conditions.push(v);
   });
+  const showSeason=SEASON_TAG_CATS.includes(cat)||CORE_CATS.includes(cat);
+  if(showSeason&&!seasons.length){showToast('Please select at least one temperature tag');return;}
   const occasion=OCCASION_CATS.includes(cat)&&document.getElementById('occasion-tog').classList.contains('active');
   const unavailable=document.getElementById('unavailable-tog').classList.contains('active');
   const item=items.find(i=>i.id===editingItemId);
@@ -2081,14 +2116,14 @@ async function saveItemModal(){
     const name=`${CATS[cat].label} ${items.filter(i=>i.cat===cat).length+1}`;
     const newItem={id:'i'+Date.now(),name,cat,emoji:CATS[cat].emoji,img,seasons,conditions,occasion,unavailable,wornCount:0,lastWorn:''};
     items.push(newItem);
-    closeItemModal();renderWardrobe();showSaving();
+    closeItemModal();showSaving();
     await apiCall({action:'saveItem',data:newItem});
     if(CORE_CATS.includes(cat)){
       openCurateScreen(newItem.id);
     } else if(ACC_CATS.includes(cat)){
       openLinkOutfits(newItem.id);
     } else {
-      showToast('Item added!');
+      renderWardrobe();showToast('Item added!');
     }
   }
 }
@@ -2106,7 +2141,7 @@ async function deleteCurrentItem(){
     outfits=outfits.filter(o=>!ids.includes(o.id));
     closeItemModal();renderWardrobe();showSaving();
     await apiCall({action:'deleteItem',id:editingItemId});
-    await Promise.all(ids.map(oid=>apiCall({action:'deleteOutfit',id:oid})));
+    for(const oid of ids){await apiCall({action:'deleteOutfit',id:oid});}
     showToast('Item and outfits removed');
   } else {
     items=items.filter(i=>i.id!==editingItemId);
@@ -2329,7 +2364,11 @@ function curateSavePair(pieces){
   outfits.push(outfit);
   curateSavedOutfits.push(outfit);
   // Save immediately rather than batching at the end
-  apiCall({action:'saveOutfit',data:{...outfit,accByCat:JSON.stringify(outfit.accByCat)}});
+  const curateTxt=document.getElementById('curate-saving-txt');
+  if(curateTxt)curateTxt.textContent='Saving...';
+  apiCall({action:'saveOutfit',data:{...outfit,accByCat:JSON.stringify(outfit.accByCat)}}).then(()=>{
+    if(curateTxt)curateTxt.textContent='';
+  });
 }
 
 // ===== BUILD =====
