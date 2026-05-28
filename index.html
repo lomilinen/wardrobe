@@ -2750,6 +2750,7 @@ function openDayDetail(dateStr,isFuture){
 async function deleteLog(logId,dateStr,isFuture){
   if(!confirm('Remove this outfit from the calendar?'))return;
   wornLogs=wornLogs.filter(l=>l.id!==logId);
+  suggestionPages={};suggestionPageIndex={};
   renderCalendar();
   closeDayDetail();
   openDayDetail(dateStr,isFuture);
