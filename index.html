@@ -2149,6 +2149,7 @@ async function deleteCurrentItem(){
     const ids=affected.map(o=>o.id);
     items=items.filter(i=>i.id!==editingItemId);
     outfits=outfits.filter(o=>!ids.includes(o.id));
+    suggestionPages={};suggestionPageIndex={};
     closeItemModal();renderWardrobe();showSaving();
     await apiCall({action:'deleteItem',id:editingItemId});
     for(const oid of ids){await apiCall({action:'deleteOutfit',id:oid});}
