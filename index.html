@@ -1289,6 +1289,76 @@ async function confirmWornFromDetail(){
 }
 
 // ===== ITEM 5: Edit Accessories — accordion per category + item 4 season greying =====
+function closeEditAcc(){
+  document.getElementById('edit-acc-screen').classList.remove('open');
+  editAccOutfitId=null;editAccState={};editingLogId=null;
+}
+function openLinkOutfits(newItemId){
+  // Opens the edit-acc-screen in "link outfits" mode for a newly added accessory
+  // Shows all outfits so user can link the new item to them
+  const item=getItem(newItemId);
+  if(!item)return;
+  editAccOutfitId=null;
+  editAccState={};
+  const content=document.getElementById('edit-acc-content');
+  content.innerHTML='';
+  const title=document.querySelector('.edit-acc-title');
+  if(title)title.textContent=`Link ${CATS[item.cat]?.label||'item'} to outfits`;
+  // Show all outfits as selectable — user taps to link this accessory
+  const allOutfits=outfits.filter(o=>o.id!=='__preview__');
+  if(!allOutfits.length){
+    content.innerHTML='<div class="empty-state">No outfits yet. Build some outfits first.</div>';
+  } else {
+    const hint=document.createElement('div');
+    hint.style.cssText='font-size:13px;color:var(--ink-muted);margin-bottom:1rem;';
+    hint.textContent='Tap outfits to link this item to them.';
+    content.appendChild(hint);
+    const grid=document.createElement('div');
+    grid.style.cssText='display:grid;grid-template-columns:repeat(3,1fr);gap:8px;';
+    const linkedOutfitIds=new Set();
+    allOutfits.forEach(o=>{
+      const card=document.createElement('div');
+      card.style.cssText='border-radius:var(--rsm);border:2px solid var(--border);overflow:hidden;cursor:pointer;';
+      card.id=`link-outfit-${o.id}`;
+      card.innerHTML=buildFlatlayCore(o.id);
+      card.onclick=()=>{
+        if(linkedOutfitIds.has(o.id)){
+          linkedOutfitIds.delete(o.id);
+          card.style.borderColor='var(--border)';
+          const cat=item.cat;
+          o.accByCat[cat]=(o.accByCat[cat]||[]).filter(id=>id!==newItemId);
+          o.accessories=Object.values(o.accByCat).flat();
+        } else {
+          linkedOutfitIds.add(o.id);
+          card.style.borderColor='var(--sage)';
+          const cat=item.cat;
+          if(!o.accByCat[cat])o.accByCat[cat]=[];
+          if(!o.accByCat[cat].includes(newItemId))o.accByCat[cat].push(newItemId);
+          o.accessories=Object.values(o.accByCat).flat();
+        }
+      };
+      grid.appendChild(card);
+    });
+    content.appendChild(grid);
+  }
+  // Override save button to save all linked outfits sequentially
+  const saveBtn=document.querySelector('.acc-edit-save-btn');
+  if(saveBtn){
+    saveBtn.onclick=async()=>{
+      const toSave=outfits.filter(o=>o.accessories&&o.accessories.includes(newItemId));
+      if(toSave.length){
+        showSaving();
+        for(const o of toSave){
+          await apiCall({action:'updateOutfit',data:{...o,accByCat:JSON.stringify(o.accByCat)}});
+        }
+        showToast(`Linked to ${toSave.length} outfit${toSave.length>1?'s':''}!`);
+      }
+      closeEditAcc();
+      if(saveBtn)saveBtn.onclick=()=>editingLogId?saveEditAccForLog():saveEditAcc();
+    };
+  }
+  document.getElementById('edit-acc-screen').classList.add('open');
+}
 function openEditAccFromDetail(){
   if(!currentOutfitDetailId)return;
   const o=outfits.find(x=>x.id===currentOutfitDetailId);
@@ -1988,7 +2058,7 @@ async function saveItemModal(){
   if(pairedMarkedForRemoval.size>0){
     if(isAcc){
       // Unlink accessory from marked outfits
-      const removalPromises=[];
+      const removalOutfits=[];
       pairedMarkedForRemoval.forEach(outfitId=>{
         const o=outfits.find(x=>x.id===outfitId);
         if(!o)return;
@@ -1996,9 +2066,9 @@ async function saveItemModal(){
           if(o.accByCat[c])o.accByCat[c]=o.accByCat[c].filter(a=>a!==editingItemId);
         });
         o.accessories=Object.values(o.accByCat).flat();
-        removalPromises.push(apiCall({action:'updateOutfit',data:{...o,accByCat:JSON.stringify(o.accByCat)}}));
+        removalOutfits.push(o);
       });
-      await Promise.all(removalPromises);
+      for(const o of removalOutfits){await apiCall({action:'updateOutfit',data:{...o,accByCat:JSON.stringify(o.accByCat)}});}
     }
   }
 
@@ -2235,10 +2305,7 @@ async function curateNext(){
   curateStepIdx++;
   if(curateStepIdx>=curateSteps.length){
     // Save all at once
-    if(curateSavedOutfits.length){
-      showSaving();
-      await Promise.all(curateSavedOutfits.map(o=>apiCall({action:'saveOutfit',data:{...o,accByCat:JSON.stringify(o.accByCat)}})));
-    }
+    if(curateSavedOutfits.length)showSaving();
     closeCurateScreen();
   } else {
     renderCurateStep();
@@ -2248,10 +2315,7 @@ async function curateNext(){
 function curateSkip(){
   curateStepIdx++;
   if(curateStepIdx>=curateSteps.length){
-    if(curateSavedOutfits.length){
-      showSaving();
-      Promise.all(curateSavedOutfits.map(o=>apiCall({action:'saveOutfit',data:{...o,accByCat:JSON.stringify(o.accByCat)}}))).then(()=>{});
-    }
+    if(curateSavedOutfits.length)showSaving();
     closeCurateScreen();
   } else {
     curateSelected=new Set();
@@ -2264,6 +2328,8 @@ function curateSavePair(pieces){
   const outfit={id:'o'+Date.now()+Math.random().toString(36).slice(2),num:nextNum,pieces,accessories:[],accByCat:{},seasons:[],conditions:[],lastWorn:''};
   outfits.push(outfit);
   curateSavedOutfits.push(outfit);
+  // Save immediately rather than batching at the end
+  apiCall({action:'saveOutfit',data:{...outfit,accByCat:JSON.stringify(outfit.accByCat)}});
 }
 
 // ===== BUILD =====
