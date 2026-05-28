@@ -647,8 +647,8 @@ const WARDROBE_TYPE_LABELS=['All types','Everyday','🎉 Occasion','🚫 Unavail
 let wardrobeTypeIdx=0;
 
 // Outfits sort/type state
-const OUTFITS_SORTS=['least','most'];
-const OUTFITS_SORT_LABELS=['Least worn','Most worn'];
+const OUTFITS_SORTS=['least','most','newest','oldest'];
+const OUTFITS_SORT_LABELS=['Least worn','Most worn','Newest','Oldest'];
 let outfitsSortIdx=0;
 
 const OUTFITS_TYPES=['','everyday','occasion','unavailable'];
@@ -706,13 +706,20 @@ function showSaving(){
 // ===== WEATHER =====
 async function loadWeather(){
   try{
-    const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&current=temperature_2m,weathercode&daily=temperature_2m_max,weathercode&timezone=America%2FLos_Angeles&forecast_days=10`);
+    const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&current=temperature_2m,weathercode&daily=weathercode&hourly=temperature_2m&timezone=America%2FLos_Angeles&forecast_days=10`);
     const d=await r.json();
     const tempC=Math.round(d.current.temperature_2m);
     const code=d.current.weathercode;
     weather={tempC,condition:wmoToCondition(code),label:wmoToLabel(code),icon:wmoToIcon(code)};
+    function dayAvgTemp(dateStr){
+      const hours=d.hourly.time.reduce((acc,t,i)=>{
+        if(t.startsWith(dateStr)){const h=parseInt(t.slice(11,13));if(h>=8&&h<=20)acc.push(d.hourly.temperature_2m[i]);}
+        return acc;
+      },[]);
+      return hours.length?Math.round(hours.reduce((s,v)=>s+v,0)/hours.length):null;
+    }
     forecast=d.daily.time.map((date,i)=>({
-      date,tempC:Math.round(d.daily.temperature_2m_max[i]),
+      date,tempC:dayAvgTemp(date)??Math.round(d.hourly.temperature_2m[i*24]||0),
       condition:wmoToCondition(d.daily.weathercode[i]),
       icon:wmoToIcon(d.daily.weathercode[i]),
       label:wmoToLabel(d.daily.weathercode[i])
@@ -1113,7 +1120,11 @@ function renderOutfits(){
   if(typeFilter==='occasion')outfitsFiltered=outfitsFiltered.filter(o=>isOccasionOutfit(o));
   if(typeFilter==='everyday')outfitsFiltered=outfitsFiltered.filter(o=>!isOccasionOutfit(o)&&!isUnavailableOutfit(o));
   if(typeFilter==='unavailable')outfitsFiltered=outfitsFiltered.filter(o=>isUnavailableOutfit(o));
-  outfitsFiltered.sort((a,b)=>{const d=sort==='most'?score(a)-score(b):score(b)-score(a);return d!==0?d:a.id.localeCompare(b.id);});
+  outfitsFiltered.sort((a,b)=>{
+    if(sort==='newest')return b.id.localeCompare(a.id);
+    if(sort==='oldest')return a.id.localeCompare(b.id);
+    const d=sort==='most'?score(a)-score(b):score(b)-score(a);return d!==0?d:a.id.localeCompare(b.id);
+  });
   renderOutfitsPage();
 }
 
@@ -2116,7 +2127,8 @@ function renderCurateStep(){
       ${it.img?`<img src="${it.img}" loading="lazy">`:`<span style="font-size:24px;">${it.emoji||'👕'}</span>`}
     </div>`).join('');
 
-  document.getElementById('curate-next-btn').textContent=curateStepIdx===curateSteps.length-1?'Finish':'Next →';
+  const willInjectMore=['topBottomPairs','bottomTopPairs','jumperTopPairs'].includes(curateSteps[curateStepIdx]?.nextFn);
+  document.getElementById('curate-next-btn').textContent=(!willInjectMore&&curateStepIdx===curateSteps.length-1)?'Finish':'Next →';
 }
 
 function toggleCurateItem(id){
@@ -2139,7 +2151,7 @@ async function curateNext(){
       const botId=isTop?pairedId:curateItemId;
       // Save top+bottom outfit if not duplicate
       const pieces=[topId,botId];
-      if(!isDuplicateOutfit(pieces))curateSavePair(pieces);
+      curateSavePair(pieces);
       // Add jumper step for this pair
       const jumpers=items.filter(j=>j.cat==='jumpers');
       if(jumpers.length){
@@ -2191,18 +2203,18 @@ async function curateNext(){
   } else if(step.nextFn==='saveWithJumper'){
     selected.forEach(jId=>{
       const pieces=[...step.pairPieces,jId];
-      if(!isDuplicateOutfit(pieces))curateSavePair(pieces);
+      curateSavePair(pieces);
     });
   } else if(step.nextFn==='saveJumperWithBottom'){
     selected.forEach(botId=>{
       const pieces=[...step.pairPieces,botId];
-      if(!isDuplicateOutfit(pieces))curateSavePair(pieces);
+      curateSavePair(pieces);
     });
   } else if(step.nextFn==='dressSave'){
     const isJumper=getItem(curateItemId)?.cat==='jumpers';
     selected.forEach(id=>{
       const pieces=isJumper?[id,curateItemId]:[curateItemId,id];
-      if(!isDuplicateOutfit(pieces))curateSavePair(pieces);
+      curateSavePair(pieces);
     });
   }
 
