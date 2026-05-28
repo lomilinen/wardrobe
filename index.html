@@ -20,18 +20,18 @@
 }
 html{height:100%;}
 body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);min-height:100%;font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;}
-.app{max-width:860px;margin:0 auto;padding:1.5rem 1.25rem 6rem;}
+.app{max-width:860px;margin:0 auto;padding:0.75rem 1.25rem 6rem;}
 
 /* HEADER */
-.header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.75rem;padding-bottom:1.25rem;border-bottom:1px solid var(--border);}
+.header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;padding-bottom:0.75rem;border-bottom:1px solid var(--border);}
 .logo{font-family:'Cormorant Garamond',serif;font-size:26px;font-weight:400;}
 .logo em{font-style:italic;color:var(--ink-muted);}
 .wpill{display:flex;align-items:center;gap:6px;background:var(--warm);border:1px solid var(--border);border-radius:var(--rpill);padding:5px 13px;font-size:12px;color:var(--ink-soft);}
 .wdot{width:6px;height:6px;border-radius:50%;background:var(--sage);flex-shrink:0;}
 
 /* TABS */
-.tabs{display:flex;gap:3px;background:var(--warm);border:1px solid var(--border);border-radius:var(--r);padding:4px;margin-bottom:1.75rem;}
-.tab{flex:1;padding:9px 2px;border-radius:var(--rsm);font-size:11px;color:var(--ink-muted);cursor:pointer;border:none;background:none;font-family:'DM Sans',sans-serif;transition:all .15s;text-align:center;}
+.tabs{display:flex;gap:3px;background:var(--warm);border:1px solid var(--border);border-radius:var(--r);padding:3px;margin-bottom:1rem;}
+.tab{flex:1;padding:7px 2px;border-radius:var(--rsm);font-size:11px;color:var(--ink-muted);cursor:pointer;border:none;background:none;font-family:'DM Sans',sans-serif;transition:all .15s;text-align:center;}
 .tab.active{background:var(--ink);color:var(--warm);font-weight:500;}
 .tab:hover:not(.active){color:var(--ink);background:var(--cream);}
 .view{display:none;}.view.active{display:block;}
@@ -179,7 +179,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
 .save-btn:disabled{opacity:.35;cursor:not-allowed;}
 
 /* CALENDAR */
-.cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;}
+.cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem;}
 .cal-nav-btn{background:none;border:1px solid var(--border);border-radius:var(--rsm);padding:6px 12px;cursor:pointer;font-size:14px;color:var(--ink-soft);font-family:'DM Sans',sans-serif;}
 .cal-month{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:400;}
 .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;}
@@ -304,8 +304,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
         <option value="all">All categories</option>
         <option value="tops">Tops</option>
         <option value="bottoms">Bottoms</option>
-        <option value="dresses">Dresses</option>
         <option value="jumpers">Jumpers</option>
+        <option value="dresses">Dresses</option>
         <option value="shoes">Shoes</option>
         <option value="coats">Coats</option>
         <option value="bags">Bags</option>
@@ -355,7 +355,16 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
   <!-- OUTFITS -->
   <div id="view-outfits" class="view">
     <div class="outfits-controls" style="flex-wrap:wrap;gap:6px;">
-      <button class="catbtn" id="outfits-sort-btn" onclick="cycleOutfitsSort()">Least worn</button>
+      <select class="wdropdown" id="outfits-sort-select" onchange="onOutfitsSortChange(this)">
+        <option value="">Default order</option>
+        <option value="least-worn">Least worn</option>
+        <option value="most-worn">Most worn</option>
+      </select>
+      <select class="wdropdown" id="outfits-type-select" onchange="onOutfitsTypeChange(this)">
+        <option value="everyday">Everyday</option>
+        <option value="all">All outfits</option>
+        <option value="occasion">🎉 Occasion</option>
+      </select>
       <button class="catbtn" id="outfits-weather-btn" onclick="toggleOutfitsWeatherPicker()">Weather <span id="outfits-weather-count"></span></button>
       <div id="outfits-weather-picker" style="display:none;position:fixed;background:var(--warm);border:1px solid var(--border);border-radius:var(--rsm);padding:10px;z-index:150;box-shadow:0 4px 16px rgba(0,0,0,.12);width:220px;">
         <div style="font-size:11px;color:var(--ink-faint);margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em;">Temperature</div>
@@ -371,7 +380,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
         </div>
         <button onclick="toggleOutfitsWeatherPicker()" style="width:100%;padding:6px;border-radius:var(--rsm);border:none;background:var(--ink);color:var(--warm);font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;">Done</button>
       </div>
-      <button class="catbtn active" id="outfits-type-btn" onclick="cycleOutfitsType()">Everyday</button>
       <div id="outfits-bulk-controls" style="display:none;margin-left:auto;">
         <button class="btn-danger" style="font-size:12px;padding:7px 12px;" onclick="bulkDeleteOutfits()">Delete selected</button>
       </div>
@@ -584,15 +592,15 @@ const LAT=47.6062,LON=-122.3321;
 const CATS={
   tops:       {label:'Top',          emoji:'👕'},
   bottoms:    {label:'Bottoms',      emoji:'👖'},
-  dresses:    {label:'Dress',        emoji:'👗'},
   jumpers:    {label:'Jumper',       emoji:'🧶'},
+  dresses:    {label:'Dress',        emoji:'👗'},
   shoes:      {label:'Shoes',        emoji:'👟'},
   coats:      {label:'Coat',         emoji:'🧥'},
   bags:       {label:'Bag',          emoji:'👜'},
   scarves:    {label:'Scarf/Tights', emoji:'🧣'},
   accessories:{label:'Accessories',  emoji:'💍'},
 };
-const CORE_CATS=['tops','bottoms','dresses','jumpers'];
+const CORE_CATS=['tops','bottoms','jumpers','dresses'];
 const ACC_CATS=['shoes','coats','bags','scarves','accessories'];
 const SEASON_TAG_CATS=['shoes','bags','coats','scarves','accessories'];
 const RAINY_TAG_CATS=['bottoms','dresses','shoes','bags','coats','scarves'];
@@ -651,17 +659,28 @@ function onTypeDropdownChange(sel){
   wardrobeTypeIdx=Math.max(0,WARDROBE_TYPES.indexOf(sel.value));
   renderWardrobe();
 }
-function cycleOutfitsSort(){
-  outfitsSortIdx=(outfitsSortIdx+1)%OUTFITS_SORTS.length;
-  document.getElementById('outfits-sort-btn').textContent=OUTFITS_SORT_LABELS[outfitsSortIdx];
-  document.getElementById('outfits-sort-btn').classList.toggle('active',outfitsSortIdx>0);
+
+async function bulkSetUnavailable(makeUnavailable){
+  if(!wardrobeSelected.size)return;
+  const ids=[...wardrobeSelected];
+  ids.forEach(id=>{const item=items.find(i=>i.id===id);if(item)item.unavailable=makeUnavailable;});
+  exitWardrobeSelectMode();
+  showSaving();
+  for(const id of ids){
+    const item=items.find(i=>i.id===id);
+    if(!item)continue;
+    try{await fetch(API,{method:'POST',body:JSON.stringify({action:'updateItem',item})});}
+    catch(e){console.error('bulkSetUnavailable',e);}
+  }
+}
+
+function buildCatFilterBtns(){/* removed — replaced by dropdown */}
+function onOutfitsSortChange(sel){
+  outfitsSortIdx=Math.max(0,OUTFITS_SORTS.indexOf(sel.value));
   renderOutfits();
 }
-function cycleOutfitsType(){
-  outfitsTypeIdx=(outfitsTypeIdx+1)%OUTFITS_TYPES.length;
-  const btn=document.getElementById('outfits-type-btn');
-  btn.textContent=OUTFITS_TYPE_LABELS[outfitsTypeIdx];
-  btn.classList.toggle('active',outfitsTypeIdx>0);
+function onOutfitsTypeChange(sel){
+  outfitsTypeIdx=Math.max(0,OUTFITS_TYPES.indexOf(sel.value));
   renderOutfits();
 }
 
@@ -793,7 +812,11 @@ function normaliseDate(d){
   return s;
 }
 
-function buildCatFilterBtns(){/* removed — replaced by dropdown */}
+function buildCatFilterBtns(){
+  const div=document.getElementById('cat-filter-btns');
+  div.innerHTML=`<button class="catbtn active" onclick="filterCat(this,'all')">All</button>`+
+    Object.entries(CATS).map(([k,v])=>`<button class="catbtn" onclick="filterCat(this,'${k}')">${v.label}</button>`).join('');
+}
 
 // ===== TABS =====
 function switchTab(name,btn){
@@ -1679,20 +1702,6 @@ function exitWardrobeSelectMode(){
   const countEl=document.getElementById('wardrobe-select-count');
   if(countEl)countEl.textContent='';
   if(document.getElementById('view-wardrobe')?.classList.contains('active'))renderWardrobe();
-}
-
-async function bulkSetUnavailable(makeUnavailable){
-  if(!wardrobeSelected.size)return;
-  const ids=[...wardrobeSelected];
-  ids.forEach(id=>{const item=items.find(i=>i.id===id);if(item)item.unavailable=makeUnavailable;});
-  exitWardrobeSelectMode();
-  showSaving();
-  for(const id of ids){
-    const item=items.find(i=>i.id===id);
-    if(!item)continue;
-    try{await fetch(API,{method:'POST',body:JSON.stringify({action:'updateItem',item})});}
-    catch(e){console.error('bulkSetUnavailable',e);}
-  }
 }
 
 function toggleWardrobeSection(id,titleEl){
