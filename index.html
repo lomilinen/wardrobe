@@ -1834,11 +1834,11 @@ function openEditModal(id){
   const isAcc=ACC_CATS.includes(item.cat);
 
   if(isCore){
-    pairedOutfitsForModal=outfits.filter(o=>(o.pieces||[]).includes(item.id));
+    pairedOutfitsForModal=outfits.filter(o=>(o.pieces||[]).includes(item.id)).sort((a,b)=>[...(a.pieces||[])].sort().join('|').localeCompare([...(b.pieces||[])].sort().join('|')));
   } else if(isAcc){
     pairedOutfitsForModal=outfits.filter(o=>
       Object.values(o.accByCat||{}).flat().includes(item.id)
-    );
+    ).sort((a,b)=>[...(a.pieces||[])].sort().join('|').localeCompare([...(b.pieces||[])].sort().join('|')));
   } else {
     pairedOutfitsForModal=[];
   }
