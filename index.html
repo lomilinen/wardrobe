@@ -612,6 +612,15 @@ const SEASON_RANGES={
   mild:{min:13,max:23},
   warm:{min:23,max:99}
 };
+function cToF(c){return Math.round(c*9/5+32);}
+function seasonLabel(c){
+  if(c===null||c===undefined)return'';
+  if(c<5)return'Freezing';
+  if(c<13)return'Cold';
+  if(c<23)return'Mild';
+  return'Warm';
+}
+function formatTemp(c){return`${c}°C / ${cToF(c)}°F · ${seasonLabel(c)}`;}
 
 let items=[],outfits=[],wornLogs=[];
 let weather={tempC:null,condition:'',label:'',icon:'☁️'};
@@ -708,7 +717,7 @@ async function loadWeather(){
       icon:wmoToIcon(d.daily.weathercode[i]),
       label:wmoToLabel(d.daily.weathercode[i])
     }));
-    document.getElementById('wpill-txt').textContent=`Seattle · ${tempC}°C · ${weather.label}`;
+    document.getElementById('wpill-txt').textContent=`Seattle · ${formatTemp(tempC)} · ${weather.label}`;
   }catch(e){
     document.getElementById('wpill-txt').textContent='Seattle · weather unavailable';
   }
@@ -2645,7 +2654,7 @@ function openDayDetail(dateStr,isFuture){
 
   // ITEM 3: Multiple logged outfits side by side
   if(logs.length){
-    const weatherText=(!isFuture&&logs[0].weatherLabel)?`${logs[0].tempC}°C · ${logs[0].weatherLabel}`:(isFuture&&fcast?`${fcast.icon} ${fcast.label}, ${fcast.tempC}°C`:'');
+    const weatherText=(!isFuture&&logs[0].weatherLabel)?`${formatTemp(logs[0].tempC)} · ${logs[0].weatherLabel}`:(isFuture&&fcast?`${fcast.icon} ${fcast.label} · ${formatTemp(fcast.tempC)}`:'');
     document.getElementById('sheet-weather').textContent=weatherText;
     const row=document.createElement('div');
     row.className='logged-outfits-row';
@@ -2678,7 +2687,7 @@ function openDayDetail(dateStr,isFuture){
     });
     content.appendChild(row);
   } else {
-    document.getElementById('sheet-weather').textContent=isFuture&&fcast?`${fcast.icon} ${fcast.label}, ${fcast.tempC}°C`:'';
+    document.getElementById('sheet-weather').textContent=isFuture&&fcast?`${fcast.icon} ${fcast.label} · ${formatTemp(fcast.tempC)}`:'';
   }
 
   // Suggestions — show for today and future only (not past)
