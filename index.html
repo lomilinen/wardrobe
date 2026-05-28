@@ -646,19 +646,11 @@ const OUTFITS_TYPES=['','everyday','occasion','unavailable'];
 const OUTFITS_TYPE_LABELS=['All types','Everyday','🎉 Occasion','🚫 Unavailable'];
 let outfitsTypeIdx=1; // default Everyday
 
-function onCatDropdownChange(sel){
-  currentCat=sel.value;
-  openWardrobeSection=null;
-  renderWardrobe();
-}
-function onSortDropdownChange(sel){
-  wardrobeSortIdx=Math.max(0,WARDROBE_SORTS.indexOf(sel.value));
-  renderWardrobe();
-}
-function onTypeDropdownChange(sel){
-  wardrobeTypeIdx=Math.max(0,WARDROBE_TYPES.indexOf(sel.value));
-  renderWardrobe();
-}
+function onCatDropdownChange(sel){currentCat=sel.value;openWardrobeSection=null;renderWardrobe();}
+function onSortDropdownChange(sel){wardrobeSortIdx=Math.max(0,WARDROBE_SORTS.indexOf(sel.value));renderWardrobe();}
+function onTypeDropdownChange(sel){wardrobeTypeIdx=Math.max(0,WARDROBE_TYPES.indexOf(sel.value));renderWardrobe();}
+function onOutfitsSortChange(sel){outfitsSortIdx=Math.max(0,OUTFITS_SORTS.indexOf(sel.value));renderOutfits();}
+function onOutfitsTypeChange(sel){outfitsTypeIdx=Math.max(0,OUTFITS_TYPES.indexOf(sel.value));renderOutfits();}
 
 async function bulkSetUnavailable(makeUnavailable){
   if(!wardrobeSelected.size)return;
@@ -675,12 +667,17 @@ async function bulkSetUnavailable(makeUnavailable){
 }
 
 function buildCatFilterBtns(){/* removed — replaced by dropdown */}
-function onOutfitsSortChange(sel){
-  outfitsSortIdx=Math.max(0,OUTFITS_SORTS.indexOf(sel.value));
+function cycleOutfitsSort(){
+  outfitsSortIdx=(outfitsSortIdx+1)%OUTFITS_SORTS.length;
+  document.getElementById('outfits-sort-btn').textContent=OUTFITS_SORT_LABELS[outfitsSortIdx];
+  document.getElementById('outfits-sort-btn').classList.toggle('active',outfitsSortIdx>0);
   renderOutfits();
 }
-function onOutfitsTypeChange(sel){
-  outfitsTypeIdx=Math.max(0,OUTFITS_TYPES.indexOf(sel.value));
+function cycleOutfitsType(){
+  outfitsTypeIdx=(outfitsTypeIdx+1)%OUTFITS_TYPES.length;
+  const btn=document.getElementById('outfits-type-btn');
+  btn.textContent=OUTFITS_TYPE_LABELS[outfitsTypeIdx];
+  btn.classList.toggle('active',outfitsTypeIdx>0);
   renderOutfits();
 }
 
@@ -753,8 +750,9 @@ async function init(){
   const today=new Date();
   calYear=today.getFullYear();calMonth=today.getMonth();
   buildCatFilterBtns();
-  await loadWeather();
-  // Priority: load items + logs first so calendar renders immediately
+
+  // Fire all fetches simultaneously — don't let weather block data
+  const weatherPromise=loadWeather();
   const [ir,lr]=await Promise.all([
     apiCall({action:'getItems'}),
     apiCall({action:'getLogs'})
@@ -762,11 +760,17 @@ async function init(){
   items=Array.isArray(ir)?ir.map(normalizeItem):[];
   wornLogs=Array.isArray(lr)?lr:[];
   renderCalendar();
-  // Then load outfits in background
-  const or=await apiCall({action:'getOutfits'});
-  outfits=Array.isArray(or)?or.map(normalizeOutfit):[];
-  renderCalendar(); // re-render with outfit thumbnails
   renderWardrobe();
+
+  // Load outfits in background — re-render when ready
+  apiCall({action:'getOutfits'}).then(or=>{
+    outfits=Array.isArray(or)?or.map(normalizeOutfit):[];
+    renderCalendar();
+    renderWardrobe();
+  });
+
+  // Weather resolves whenever it's ready — no need to await
+  weatherPromise.catch(()=>{});
 }
 
 function normalizeItem(i){
