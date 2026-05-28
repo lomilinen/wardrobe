@@ -717,7 +717,7 @@ async function loadWeather(){
       icon:wmoToIcon(d.daily.weathercode[i]),
       label:wmoToLabel(d.daily.weathercode[i])
     }));
-    document.getElementById('wpill-txt').textContent=`Seattle · ${formatTemp(tempC)} · ${weather.label}`;
+    document.getElementById('wpill-txt').textContent=`Seattle · ${weather.icon} ${weather.label} · ${formatTemp(tempC)}`;
   }catch(e){
     document.getElementById('wpill-txt').textContent='Seattle · weather unavailable';
   }
@@ -2654,7 +2654,7 @@ function openDayDetail(dateStr,isFuture){
 
   // ITEM 3: Multiple logged outfits side by side
   if(logs.length){
-    const weatherText=(!isFuture&&logs[0].weatherLabel)?`${formatTemp(logs[0].tempC)} · ${logs[0].weatherLabel}`:(isFuture&&fcast?`${fcast.icon} ${fcast.label} · ${formatTemp(fcast.tempC)}`:'');
+    const weatherText=(!isFuture&&logs[0].weatherLabel)?`${logs[0].weatherLabel} · ${formatTemp(logs[0].tempC)}`:(isFuture&&fcast?`${fcast.icon} ${fcast.label} · ${formatTemp(fcast.tempC)}`:'');
     document.getElementById('sheet-weather').textContent=weatherText;
     const row=document.createElement('div');
     row.className='logged-outfits-row';
