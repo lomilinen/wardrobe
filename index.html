@@ -54,7 +54,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
 .flatlay-cell{overflow:hidden;display:flex;align-items:center;justify-content:center;background:var(--cream);border:1px solid var(--border);font-size:22px;position:relative;min-width:0;}
 .flatlay-cell img{width:100%;height:100%;object-fit:contain;}
 .flatlay-more{position:absolute;inset:0;background:rgba(26,23,20,.55);display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:500;}
-.flatlay-sm .flatlay-cell{min-height:30px;font-size:8px;}
+.flatlay-sm .flatlay-cell{min-height:18px;font-size:7px;}
 .flatlay-sm .flatlay-cell img{object-fit:contain;}
 
 /* OUTFIT CARD */
@@ -357,8 +357,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
     <div class="outfits-controls" style="flex-wrap:wrap;gap:6px;">
       <select class="wdropdown" id="outfits-sort-select" onchange="onOutfitsSortChange(this)">
         <option value="">Default order</option>
-        <option value="least-worn">Least worn</option>
-        <option value="most-worn">Most worn</option>
+        <option value="least">Least worn</option>
+        <option value="most">Most worn</option>
+        <option value="newest">Newest</option>
+        <option value="oldest">Oldest</option>
       </select>
       <select class="wdropdown" id="outfits-type-select" onchange="onOutfitsTypeChange(this)">
         <option value="everyday">Everyday</option>
@@ -638,8 +640,8 @@ const WARDROBE_TYPE_LABELS=['All types','Everyday','🎉 Occasion','🚫 Unavail
 let wardrobeTypeIdx=0;
 
 // Outfits sort/type state
-const OUTFITS_SORTS=['least','most'];
-const OUTFITS_SORT_LABELS=['Least worn','Most worn'];
+const OUTFITS_SORTS=['least','most','newest','oldest'];
+const OUTFITS_SORT_LABELS=['Least worn','Most worn','Newest','Oldest'];
 let outfitsSortIdx=0;
 
 const OUTFITS_TYPES=['','everyday','occasion','unavailable'];
@@ -1104,7 +1106,14 @@ function renderOutfits(){
   if(typeFilter==='occasion')outfitsFiltered=outfitsFiltered.filter(o=>isOccasionOutfit(o));
   if(typeFilter==='everyday')outfitsFiltered=outfitsFiltered.filter(o=>!isOccasionOutfit(o)&&!isUnavailableOutfit(o));
   if(typeFilter==='unavailable')outfitsFiltered=outfitsFiltered.filter(o=>isUnavailableOutfit(o));
-  outfitsFiltered.sort((a,b)=>{const d=sort==='most'?score(a)-score(b):score(b)-score(a);return d!==0?d:a.id.localeCompare(b.id);});
+  if(sort==='newest'||sort==='oldest'){
+    outfitsFiltered.sort((a,b)=>{
+      const aNum=a.num||0,bNum=b.num||0;
+      return sort==='newest'?bNum-aNum:aNum-bNum;
+    });
+  } else {
+    outfitsFiltered.sort((a,b)=>{const d=sort==='most'?score(a)-score(b):score(b)-score(a);return d!==0?d:a.id.localeCompare(b.id);});
+  }
   renderOutfitsPage();
 }
 
@@ -1823,6 +1832,8 @@ function openEditModal(id){
   } else {
     pairedOutfitsForModal=[];
   }
+  // Sort by outfit number so duplicates are easy to spot
+  pairedOutfitsForModal.sort((a,b)=>(a.num||0)-(b.num||0));
 
   if(pairedOutfitsForModal.length){
     pairedSec.style.display='block';
