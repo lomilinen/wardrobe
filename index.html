@@ -27,7 +27,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
 .logo{font-family:'Cormorant Garamond',serif;font-size:26px;font-weight:400;}
 .logo em{font-style:italic;color:var(--ink-muted);}
 .wpill{display:flex;align-items:center;gap:6px;background:var(--warm);border:1px solid var(--border);border-radius:var(--rpill);padding:5px 13px;font-size:12px;color:var(--ink-soft);}
-.wpill-txt{white-space:normal;line-height:1.4;}
 .wdot{width:6px;height:6px;border-radius:50%;background:var(--sage);flex-shrink:0;}
 
 /* TABS */
@@ -279,7 +278,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
 <div class="app">
   <div class="header">
     <div class="logo">your <em>wardrobe</em></div>
-    <div class="wpill"><span class="wdot"></span><span id="wpill-txt" class="wpill-txt">Loading weather...</span></div>
+    <div class="wpill"><span class="wdot"></span><span id="wpill-txt">Loading weather...</span></div>
   </div>
   <div class="tabs">
     <button class="tab active" onclick="switchTab('calendar',this)">Calendar</button>
@@ -357,10 +356,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
   <div id="view-outfits" class="view">
     <div class="outfits-controls" style="flex-wrap:wrap;gap:6px;">
       <select class="wdropdown" id="outfits-sort-select" onchange="onOutfitsSortChange(this)">
-        <option value="least">Least worn</option>
-        <option value="most">Most worn</option>
-        <option value="newest">Newest</option>
-        <option value="oldest">Oldest</option>
+        <option value="">Default order</option>
+        <option value="least-worn">Least worn</option>
+        <option value="most-worn">Most worn</option>
       </select>
       <select class="wdropdown" id="outfits-type-select" onchange="onOutfitsTypeChange(this)">
         <option value="everyday">Everyday</option>
@@ -383,7 +381,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
         <button onclick="toggleOutfitsWeatherPicker()" style="width:100%;padding:6px;border-radius:var(--rsm);border:none;background:var(--ink);color:var(--warm);font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;">Done</button>
       </div>
       <div id="outfits-bulk-controls" style="display:none;margin-left:auto;">
-        <button class="btn-danger" id="outfits-bulk-delete-btn" style="font-size:12px;padding:7px 12px;" onclick="bulkDeleteOutfits()">Delete selected</button>
+        <button class="btn-danger" style="font-size:12px;padding:7px 12px;" onclick="bulkDeleteOutfits()">Delete selected</button>
       </div>
       <button class="catbtn" id="outfits-select-btn" onclick="toggleOutfitSelectMode()" style="margin-left:auto;">Select</button>
     </div>
@@ -543,10 +541,11 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
       <hr class="divider">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
         <div class="sec-label" style="margin-bottom:0;">Paired in outfits</div>
+        <button class="page-btn" id="paired-bulk-btn" onclick="togglePairedBulkMode()" style="font-size:10px;">Select</button>
       </div>
-      <div class="fhint" style="margin-bottom:10px;">Tap outfits to select them, then unlink.</div>
+      <div class="fhint" style="margin-bottom:10px;">Tap an outfit to unlink this item from it. Changes apply on Save.</div>
       <div id="paired-bulk-delete-bar" style="display:none;margin-bottom:8px;">
-        <button class="btn-danger" id="paired-unlink-btn" style="font-size:11px;padding:6px 12px;width:100%;" onclick="bulkDeletePairedOutfits()">Unlink selected outfits</button>
+        <button class="btn-danger" style="font-size:11px;padding:6px 12px;width:100%;" onclick="bulkDeletePairedOutfits()">Unlink selected outfits</button>
       </div>
       <div id="paired-outfits-list"></div>
       <div class="paired-pagination" id="paired-pagination" style="display:none;">
@@ -574,7 +573,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
     <div class="curate-context" id="curate-context" style="display:none;"></div>
     <div class="curate-dots" id="curate-dots"></div>
     <div class="curate-grid" id="curate-grid"></div>
-    <div id="curate-saving-txt" style="font-size:11px;color:var(--ink-faint);text-align:center;min-height:16px;margin-bottom:4px;"></div>
     <div class="curate-actions">
       <button class="curate-skip-btn" onclick="curateSkip()">Skip</button>
       <button class="curate-next-btn" id="curate-next-btn" onclick="curateNext()">Next →</button>
@@ -611,18 +609,9 @@ const OCCASION_CATS=['tops','jumpers','bottoms','dresses','shoes','bags'];
 const SEASON_RANGES={
   freezing:{min:-99,max:5},
   cold:{min:5,max:13},
-  mild:{min:13,max:20},
-  warm:{min:20,max:99}
+  mild:{min:13,max:23},
+  warm:{min:23,max:99}
 };
-function cToF(c){return Math.round(c*9/5+32);}
-function seasonLabel(c){
-  if(c===null||c===undefined)return'';
-  if(c<5)return'Freezing';
-  if(c<13)return'Cold';
-  if(c<20)return'Mild';
-  return'Warm';
-}
-function formatTemp(c){return`${c}°C / ${cToF(c)}°F · ${seasonLabel(c)}`;}
 
 let items=[],outfits=[],wornLogs=[];
 let weather={tempC:null,condition:'',label:'',icon:'☁️'};
@@ -649,8 +638,8 @@ const WARDROBE_TYPE_LABELS=['All types','Everyday','🎉 Occasion','🚫 Unavail
 let wardrobeTypeIdx=0;
 
 // Outfits sort/type state
-const OUTFITS_SORTS=['least','most','newest','oldest'];
-const OUTFITS_SORT_LABELS=['Least worn','Most worn','Newest','Oldest'];
+const OUTFITS_SORTS=['least','most'];
+const OUTFITS_SORT_LABELS=['Least worn','Most worn'];
 let outfitsSortIdx=0;
 
 const OUTFITS_TYPES=['','everyday','occasion','unavailable'];
@@ -708,40 +697,23 @@ function showSaving(){
 // ===== WEATHER =====
 async function loadWeather(){
   try{
-    const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&current=temperature_2m,weathercode&daily=weathercode&hourly=temperature_2m,weathercode&timezone=America%2FLos_Angeles&forecast_days=10`);
+    const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&current=temperature_2m,weathercode&daily=temperature_2m_max,weathercode&timezone=America%2FLos_Angeles&forecast_days=10`);
     const d=await r.json();
     const tempC=Math.round(d.current.temperature_2m);
     const code=d.current.weathercode;
     weather={tempC,condition:wmoToCondition(code),label:wmoToLabel(code),icon:wmoToIcon(code)};
-    function dayAvgTemp(dateStr){
-      const hours=d.hourly.time.reduce((acc,t,i)=>{
-        if(t.startsWith(dateStr)){const h=parseInt(t.slice(11,13));if(h>=8&&h<=20)acc.push(d.hourly.temperature_2m[i]);}
-        return acc;
-      },[]);
-      return hours.length?Math.round(hours.reduce((s,v)=>s+v,0)/hours.length):null;
-    }
-    function dayWorstCondition(dateStr){
-      const codes=d.hourly.time.reduce((acc,t,i)=>{
-        if(t.startsWith(dateStr)){const h=parseInt(t.slice(11,13));if(h>=8&&h<=20)acc.push(d.hourly.weathercode[i]);}
-        return acc;
-      },[]);
-      const worst=codes.length?Math.max(...codes):0;
-      return{condition:wmoToCondition(worst),icon:wmoToIcon(worst),label:wmoToLabel(worst)};
-    }
     forecast=d.daily.time.map((date,i)=>({
-      date,tempC:dayAvgTemp(date)??Math.round(d.hourly.temperature_2m[i*24]||0),
-      ...dayWorstCondition(date)
+      date,tempC:Math.round(d.daily.temperature_2m_max[i]),
+      condition:wmoToCondition(d.daily.weathercode[i]),
+      icon:wmoToIcon(d.daily.weathercode[i]),
+      label:wmoToLabel(d.daily.weathercode[i])
     }));
-    const todayStr=new Date().toLocaleDateString('en-CA');
-    const todayAvg=dayAvgTemp(todayStr)??tempC;
-    const todayWorst=dayWorstCondition(todayStr);
-    weather.tempC=todayAvg;weather.condition=todayWorst.condition;weather.label=todayWorst.label;weather.icon=todayWorst.icon;
-    document.getElementById('wpill-txt').innerHTML=`Seattle · ${weather.icon} ${weather.label}<br>avg. ${formatTemp(weather.tempC)}`;
+    document.getElementById('wpill-txt').textContent=`Seattle · ${tempC}°C · ${weather.label}`;
   }catch(e){
-    document.getElementById('wpill-txt').innerHTML='Weather unavailable';
+    document.getElementById('wpill-txt').textContent='Seattle · weather unavailable';
   }
 }
-function wmoToCondition(c){if(c>=55)return'rainy';return '';}
+function wmoToCondition(c){if(c>=51)return'rainy';return'';}
 function wmoToIcon(c){if(c<=1)return'☀️';if(c<=3)return'☁️';if(c>=51)return'🌧️';return'☁️';}
 function wmoToLabel(c){
   if(c===0)return'Clear sky';if(c<=2)return'Partly cloudy';if(c<=3)return'Overcast';
@@ -1092,8 +1064,6 @@ async function bulkDeleteOutfits(){
   if(!outfitSelected.size)return;
   if(!confirm(`Delete ${outfitSelected.size} outfit${outfitSelected.size>1?'s':''}?`))return;
   const ids=[...outfitSelected];
-  const bulkBtn=document.getElementById('outfits-bulk-delete-btn');
-  if(bulkBtn){bulkBtn.disabled=true;bulkBtn.textContent='Deleting...';}
   outfits=outfits.filter(o=>!ids.includes(o.id));
   outfitSelected=new Set();
   outfitSelectMode=false;
@@ -1103,7 +1073,6 @@ async function bulkDeleteOutfits(){
   renderOutfits();
   showSaving();
   await Promise.all(ids.map(id=>apiCall({action:'deleteOutfit',id})));
-  if(bulkBtn){bulkBtn.disabled=false;bulkBtn.textContent='Delete';}
   showToast(`${ids.length} outfit${ids.length>1?'s':''} deleted`);
 }
 
@@ -1135,11 +1104,7 @@ function renderOutfits(){
   if(typeFilter==='occasion')outfitsFiltered=outfitsFiltered.filter(o=>isOccasionOutfit(o));
   if(typeFilter==='everyday')outfitsFiltered=outfitsFiltered.filter(o=>!isOccasionOutfit(o)&&!isUnavailableOutfit(o));
   if(typeFilter==='unavailable')outfitsFiltered=outfitsFiltered.filter(o=>isUnavailableOutfit(o));
-  outfitsFiltered.sort((a,b)=>{
-    if(sort==='newest')return b.id.localeCompare(a.id);
-    if(sort==='oldest')return a.id.localeCompare(b.id);
-    const d=sort==='most'?score(a)-score(b):score(b)-score(a);return d!==0?d:a.id.localeCompare(b.id);
-  });
+  outfitsFiltered.sort((a,b)=>{const d=sort==='most'?score(a)-score(b):score(b)-score(a);return d!==0?d:a.id.localeCompare(b.id);});
   renderOutfitsPage();
 }
 
@@ -1166,6 +1131,7 @@ function renderOutfitsPage(){
           ${isOcc?'<span class="sbadge badge-old">🎉 Occasion</span>':''}
           <span class="sbadge ${dUnworn>=14?'badge-old':'badge-ok'}">${dUnworn>=999?'never worn':dUnworn>=14?`⏳ ${dUnworn}d unworn`:'✓ Good rotation'}</span>
         </div>
+        <span style="font-size:9px;color:var(--ink-faint);opacity:.6;">#${o.num}</span>
       </div>
     </div>`;
   }).join('');
@@ -1279,7 +1245,6 @@ async function confirmWornFromDetail(){
   const allWorn=[...o.pieces,...chosenAccs];
   allWorn.forEach(pid=>{const it=getItem(pid);if(it){it.lastWorn=new Date().toISOString();it.wornCount=(it.wornCount||0)+1;}});
   wornLogs.push(log);
-  suggestionPages={};suggestionPageIndex={};
   closeDatePickScreen();
   closeOutfitDetail();
   renderCalendar();
@@ -1293,106 +1258,6 @@ async function confirmWornFromDetail(){
 }
 
 // ===== ITEM 5: Edit Accessories — accordion per category + item 4 season greying =====
-function closeEditAcc(){
-  document.getElementById('edit-acc-screen').classList.remove('open');
-  editAccOutfitId=null;editAccState={};editingLogId=null;
-}
-function openLinkOutfits(newItemId){
-  const item=getItem(newItemId);
-  if(!item)return;
-  editAccOutfitId=null;
-  editAccState={};
-  const selectedItemIds=new Set();
-  const content=document.getElementById('edit-acc-content');
-  content.innerHTML='';
-  const title=document.querySelector('.edit-acc-title');
-  if(title)title.textContent=`Which items does this ${CATS[item.cat]?.label||'item'} go with?`;
-
-  const hint=document.createElement('div');
-  hint.style.cssText='font-size:13px;color:var(--ink-muted);margin-bottom:1.25rem;line-height:1.5;';
-  hint.textContent='Select the items this goes with. It will be linked to all outfits containing any of them.';
-  content.appendChild(hint);
-
-  // Build accordion per core category
-  CORE_CATS.forEach(cat=>{
-    const catItems=items.filter(i=>i.cat===cat&&i.id!==newItemId);
-    if(!catItems.length)return;
-    const section=document.createElement('div');
-    section.className='acc-edit-cat';
-    section.style.marginBottom='12px';
-    const header=document.createElement('div');
-    header.className='acc-edit-cat-header';
-    header.style.cssText='cursor:pointer;display:flex;align-items:center;justify-content:space-between;padding:8px 0;';
-    header.innerHTML=`${CATS[cat].label} <span class="acc-count-pill" id="link-count-${cat}">0 selected</span> <span class="acc-arrow" id="link-arrow-${cat}">▸</span>`;
-    const grid=document.createElement('div');
-    grid.className='acc-edit-options';
-    grid.id=`link-cat-${cat}`;
-    grid.style.display='none';
-    grid.style.cssText='display:none;grid-template-columns:repeat(4,1fr);gap:8px;padding:8px 0;';
-    catItems.forEach(it=>{
-      const card=document.createElement('div');
-      card.className='acc-edit-item';
-      card.id=`link-item-${it.id}`;
-      card.style.cssText='border-radius:var(--rsm);border:2px solid var(--border);overflow:hidden;cursor:pointer;aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;background:var(--warm);';
-      card.innerHTML=it.img?`<img src="${it.img}" style="width:100%;height:100%;object-fit:contain;" loading="lazy">`:`<span style="font-size:24px;">${it.emoji||'👕'}</span>`;
-      card.onclick=()=>{
-        if(selectedItemIds.has(it.id)){
-          selectedItemIds.delete(it.id);
-          card.style.borderColor='var(--border)';
-        } else {
-          selectedItemIds.add(it.id);
-          card.style.borderColor='var(--sage)';
-        }
-        const count=catItems.filter(i=>selectedItemIds.has(i.id)).length;
-        document.getElementById(`link-count-${cat}`).textContent=`${count} selected`;
-      };
-      grid.appendChild(card);
-    });
-    header.onclick=()=>{
-      const isOpen=grid.style.display!=='none';
-      grid.style.display=isOpen?'none':'grid';
-      document.getElementById(`link-arrow-${cat}`).textContent=isOpen?'▸':'▾';
-    };
-    section.appendChild(header);
-    section.appendChild(grid);
-    content.appendChild(section);
-  });
-
-  // Override save button
-  const saveBtn=document.querySelector('.acc-edit-save-btn');
-  if(saveBtn){
-    saveBtn.disabled=false;
-    saveBtn.textContent='Save';
-    saveBtn.onclick=async()=>{
-      if(!selectedItemIds.size){showToast('Select at least one item to link');return;}
-      // Find all outfits containing any selected item
-      const toUpdate=outfits.filter(o=>o.id!=='__preview__'&&(o.pieces||[]).some(pid=>selectedItemIds.has(pid)));
-      saveBtn.disabled=true;
-      saveBtn.textContent=`Saving… 0 / ${toUpdate.length}`;
-      let saved=0;
-      const batchSize=10;
-      for(let i=0;i<toUpdate.length;i+=batchSize){
-        const batch=toUpdate.slice(i,i+batchSize);
-        await Promise.all(batch.map(o=>{
-          if(!o.accByCat[item.cat])o.accByCat[item.cat]=[];
-          if(!o.accByCat[item.cat].includes(newItemId))o.accByCat[item.cat].push(newItemId);
-          o.accessories=Object.values(o.accByCat).flat();
-          return apiCall({action:'updateOutfit',data:{...o,accByCat:JSON.stringify(o.accByCat)}});
-        }));
-        saved+=batch.length;
-        saveBtn.textContent=`Saving… ${saved} / ${toUpdate.length}`;
-        if(i+batchSize<toUpdate.length)await new Promise(r=>setTimeout(r,300));
-      }
-      showToast(`Linked to ${toUpdate.length} outfit${toUpdate.length!==1?'s':''}!`);
-      saveBtn.disabled=false;
-      saveBtn.textContent='Save';
-      saveBtn.onclick=()=>editingLogId?saveEditAccForLog():saveEditAcc();
-      renderWardrobe();
-      closeEditAcc();
-    };
-  }
-  document.getElementById('edit-acc-screen').classList.add('open');
-}
 function openEditAccFromDetail(){
   if(!currentOutfitDetailId)return;
   const o=outfits.find(x=>x.id===currentOutfitDetailId);
@@ -1458,8 +1323,6 @@ function toggleEditAcc(cat,itemId){
 async function saveEditAcc(){
   const o=outfits.find(x=>x.id===editAccOutfitId);
   if(!o)return;
-  const saveBtn=document.querySelector('.acc-edit-save-btn');
-  if(saveBtn){saveBtn.disabled=true;saveBtn.textContent='Saving...';}
   ACC_CATS.forEach(cat=>{o.accByCat[cat]=editAccState[cat]||[];});
   o.accessories=Object.values(o.accByCat).flat();
   document.getElementById('outfit-detail-flatlay').innerHTML=buildFlatlayCore(editAccOutfitId);
@@ -1491,7 +1354,6 @@ async function saveEditAcc(){
   closeEditAcc();
   showSaving();
   await apiCall({action:'updateOutfit',data:{...o,accByCat:JSON.stringify(o.accByCat)}});
-  if(saveBtn){saveBtn.disabled=false;saveBtn.textContent='Save';}
   showToast('Accessories saved');
 }
 
@@ -1622,7 +1484,6 @@ async function confirmWorn(){
   const allWorn=[...o.pieces,...chosenAccs];
   allWorn.forEach(pid=>{const it=getItem(pid);if(it){it.lastWorn=new Date().toISOString();it.wornCount=(it.wornCount||0)+1;}});
   wornLogs.push(log);
-  suggestionPages={};suggestionPageIndex={};
   closeWearing();
   renderCalendar();
   showSaving();
@@ -1711,6 +1572,9 @@ function renderWardrobe(){
 
 // ITEM 6: 4 per row — done via CSS (.items-grid uses repeat(4,1fr))
 function itemCard(item){
+  const catItems=items.filter(i=>i.cat===item.cat);
+  const itemNum=catItems.findIndex(i=>i.id===item.id)+1;
+  const label=`${CATS[item.cat]?.label||''} ${itemNum}`;
   if(wardrobeSelectMode){
     const sel=wardrobeSelected.has(item.id);
     return`<div class="icard${item.unavailable?' icard-unavailable':''}${sel?' icard-selected':''}" onclick="toggleWardrobeItemSelect('${item.id}')" style="position:relative;">
@@ -1718,12 +1582,18 @@ function itemCard(item){
         ?`<div style="position:absolute;top:4px;right:4px;width:18px;height:18px;border-radius:50%;background:var(--sage);display:flex;align-items:center;justify-content:center;z-index:2;"><svg width='10' height='10' viewBox='0 0 10 10'><polyline points='1.5,5 4,7.5 8.5,2.5' stroke='%23fff' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg></div>`
         :`<div style="position:absolute;top:4px;right:4px;width:18px;height:18px;border-radius:50%;border:2px solid var(--border-mid);background:var(--warm);z-index:2;"></div>`}
       <div class="iimg">${item.img?`<img src="${item.img}" loading="lazy">`:`<span>${item.emoji||CATS[item.cat]?.emoji||'👕'}</span>`}</div>
-      <div class="imeta"><div class="iworn">${item.unavailable?'🚫 ':item.occasion?'🎉 ':''} ${item.wornCount||0}× · ${daysSinceLabel(item.lastWorn)}</div></div>
+      <div class="imeta">
+        <div style="font-size:9px;color:var(--ink-faint);opacity:.6;margin-bottom:1px;">${label}</div>
+        <div class="iworn">${item.unavailable?'🚫 ':item.occasion?'🎉 ':''} ${item.wornCount||0}× · ${daysSinceLabel(item.lastWorn)}</div>
+      </div>
     </div>`;
   }
   return`<div class="icard${item.unavailable?' icard-unavailable':''}" onclick="openEditModal('${item.id}')">
     <div class="iimg">${item.img?`<img src="${item.img}" loading="lazy">`:`<span>${item.emoji||CATS[item.cat]?.emoji||'👕'}</span>`}</div>
-    <div class="imeta"><div class="iworn">${item.unavailable?'🚫 ':item.occasion?'🎉 ':''} ${item.wornCount||0}× · ${daysSinceLabel(item.lastWorn)}</div></div>
+    <div class="imeta">
+      <div style="font-size:9px;color:var(--ink-faint);opacity:.6;margin-bottom:1px;">${label}</div>
+      <div class="iworn">${item.unavailable?'🚫 ':item.occasion?'🎉 ':''} ${item.wornCount||0}× · ${daysSinceLabel(item.lastWorn)}</div>
+    </div>
   </div>`;
 }
 
@@ -1796,11 +1666,13 @@ function navigateOutfitDetail(dir){
 }
 
 function navigateItemModal(dir){
-  // Get flat sorted/filtered item list matching current wardrobe view
+  const currentItem=items.find(i=>i.id===editingItemId);
+  if(!currentItem)return;
   const typeFilter=WARDROBE_TYPES[wardrobeTypeIdx]||'';
   const tempFilters=[...wardrobeWeatherFilters].filter(f=>f!=='rainy');
   const rainFilter=wardrobeWeatherFilters.has('rainy');
-  let pool=(currentCat==='all'?items:items.filter(i=>i.cat===currentCat)).filter(i=>{
+  // Always navigate within the same category
+  let pool=items.filter(i=>i.cat===currentItem.cat).filter(i=>{
     if(tempFilters.length&&!tempFilters.some(tf=>(i.seasons||[]).includes(tf)))return false;
     if(rainFilter&&RAINY_TAG_CATS.includes(i.cat)&&!(i.conditions||[]).includes('rainy'))return false;
     if(typeFilter==='occasion'&&!i.occasion)return false;
@@ -1868,38 +1740,26 @@ function filterCat(btn,cat){
 // ===== ITEM MODAL — ITEM 7: paired-in for ALL categories =====
 let pairedOutfitsForModal=[];
 const PAIRED_PER_PAGE=12;
-let pairedBulkMode=true;
+let pairedBulkMode=false;
 let pairedBulkSelected=new Set();
 
 function togglePairedBulkMode(){
-  // No-op — always in bulk mode now
+  pairedBulkMode=!pairedBulkMode;
+  pairedBulkSelected=new Set();
+  document.getElementById('paired-bulk-btn').textContent=pairedBulkMode?'Cancel':'Select';
+  document.getElementById('paired-bulk-delete-bar').style.display=pairedBulkMode?'block':'none';
+  // Change 2: do NOT reset page when toggling select mode
+  renderPairedOutfits();
 }
 
-async function bulkDeletePairedOutfits(){
-  if(!pairedBulkSelected.size){showToast('Select at least one outfit first');return;}
-  const btn=document.getElementById('paired-unlink-btn');
-  if(btn){btn.disabled=true;btn.textContent='Unlinking...';}
-  const ids=[...pairedBulkSelected];
-  const item=items.find(i=>i.id===editingItemId);
-  const outfitsToUpdate=[];
-  ids.forEach(outfitId=>{
-    const o=outfits.find(x=>x.id===outfitId);
-    if(!o)return;
-    if(item&&ACC_CATS.includes(item.cat)){
-      ACC_CATS.forEach(c=>{if(o.accByCat[c])o.accByCat[c]=o.accByCat[c].filter(a=>a!==editingItemId);});
-      o.accessories=Object.values(o.accByCat).flat();
-    }
-    outfitsToUpdate.push(o);
-  });
-  pairedOutfitsForModal=pairedOutfitsForModal.filter(o=>!ids.includes(o.id));
+function bulkDeletePairedOutfits(){
+  if(!pairedBulkSelected.size)return;
+  pairedBulkSelected.forEach(id=>pairedMarkedForRemoval.add(id));
+  pairedBulkMode=false;
   pairedBulkSelected=new Set();
+  document.getElementById('paired-bulk-btn').textContent='Select';
+  document.getElementById('paired-bulk-delete-bar').style.display='none';
   renderPairedOutfits();
-  showSaving();
-  for(const o of outfitsToUpdate){
-    await apiCall({action:'updateOutfit',data:{...o,accByCat:JSON.stringify(o.accByCat)}});
-  }
-  if(btn){btn.disabled=false;btn.textContent='Unlink selected outfits';}
-  showToast(`${ids.length} outfit${ids.length>1?'s':''} unlinked`);
 }
 
 function openAddModal(){
@@ -1955,11 +1815,11 @@ function openEditModal(id){
   const isAcc=ACC_CATS.includes(item.cat);
 
   if(isCore){
-    pairedOutfitsForModal=outfits.filter(o=>(o.pieces||[]).includes(item.id)).sort((a,b)=>[...(a.pieces||[])].sort().join('|').localeCompare([...(b.pieces||[])].sort().join('|')));
+    pairedOutfitsForModal=outfits.filter(o=>(o.pieces||[]).includes(item.id));
   } else if(isAcc){
     pairedOutfitsForModal=outfits.filter(o=>
       Object.values(o.accByCat||{}).flat().includes(item.id)
-    ).sort((a,b)=>[...(a.pieces||[])].sort().join('|').localeCompare([...(b.pieces||[])].sort().join('|')));
+    );
   } else {
     pairedOutfitsForModal=[];
   }
@@ -1968,13 +1828,18 @@ function openEditModal(id){
     pairedSec.style.display='block';
     // Change 1: different hint and behaviour for core vs acc
     const hintEl=document.querySelector('#paired-outfits-section .fhint');
+    const bulkBtn=document.getElementById('paired-bulk-btn');
     if(isCore){
       if(hintEl)hintEl.textContent='Tap an outfit to delete it permanently.';
+      bulkBtn.style.display='none';
     } else {
-      if(hintEl)hintEl.textContent='Tap outfits to select them, then unlink.';
+      if(hintEl)hintEl.textContent='Tap an outfit to unlink this item from it. Changes apply on Save.';
+      bulkBtn.style.display='block';
     }
+    pairedBulkMode=false;
     pairedBulkSelected=new Set();
     document.getElementById('paired-bulk-delete-bar').style.display='none';
+    bulkBtn.textContent='Select';
     renderPairedOutfits();
   } else {
     pairedSec.style.display='none';
@@ -2005,13 +1870,16 @@ function renderPairedOutfits(){
     let clickAction;
     if(isCore){
       clickAction=`deletePairedOutfit('${o.id}')`;
-    } else {
+    } else if(pairedBulkMode){
       clickAction=`togglePairedBulkSelect('${o.id}')`;
+    } else {
+      clickAction=`togglePairedRemove('${o.id}')`;
     }
-    return`<div class="paired-outfit-card${isBulkSel?' outfit-card-selected':''}" onclick="${clickAction}">
+    return`<div class="paired-outfit-card${isMarked?' marked-remove':''}${isBulkSel?' outfit-card-selected':''}" onclick="${clickAction}">
       ${flHtml||'<div style="height:40px;display:flex;align-items:center;justify-content:center;font-size:18px;">👗</div>'}
+      ${isMarked?'<div class="paired-remove-badge">Unlink</div>':''}
       ${isBulkSel?'<div class="paired-remove-badge" style="background:var(--sage);">✓</div>':''}
-      <button class="paired-outfit-open-btn" onclick="event.stopPropagation();openOutfitFromItem('${o.id}')">Open</button>
+      ${!pairedBulkMode?`<button class="paired-outfit-open-btn" onclick="event.stopPropagation();openOutfitFromItem('${o.id}')">Open</button>`:''}
     </div>`;
   }).join('')}</div>`;
 
@@ -2030,7 +1898,6 @@ function renderPairedOutfits(){
 function togglePairedBulkSelect(outfitId){
   if(pairedBulkSelected.has(outfitId))pairedBulkSelected.delete(outfitId);
   else pairedBulkSelected.add(outfitId);
-  document.getElementById('paired-bulk-delete-bar').style.display=pairedBulkSelected.size?'block':'none';
   renderPairedOutfits();
 }
 
@@ -2091,8 +1958,6 @@ async function saveItemModal(){
     if(g==='season')seasons.push(v);
     if(g==='condition')conditions.push(v);
   });
-  const showSeason=SEASON_TAG_CATS.includes(cat)||CORE_CATS.includes(cat);
-  if(showSeason&&!seasons.length){showToast('Please select at least one temperature tag');return;}
   const occasion=OCCASION_CATS.includes(cat)&&document.getElementById('occasion-tog').classList.contains('active');
   const unavailable=document.getElementById('unavailable-tog').classList.contains('active');
   const item=items.find(i=>i.id===editingItemId);
@@ -2102,7 +1967,7 @@ async function saveItemModal(){
   if(pairedMarkedForRemoval.size>0){
     if(isAcc){
       // Unlink accessory from marked outfits
-      const removalOutfits=[];
+      const removalPromises=[];
       pairedMarkedForRemoval.forEach(outfitId=>{
         const o=outfits.find(x=>x.id===outfitId);
         if(!o)return;
@@ -2110,9 +1975,9 @@ async function saveItemModal(){
           if(o.accByCat[c])o.accByCat[c]=o.accByCat[c].filter(a=>a!==editingItemId);
         });
         o.accessories=Object.values(o.accByCat).flat();
-        removalOutfits.push(o);
+        removalPromises.push(apiCall({action:'updateOutfit',data:{...o,accByCat:JSON.stringify(o.accByCat)}}));
       });
-      for(const o of removalOutfits){await apiCall({action:'updateOutfit',data:{...o,accByCat:JSON.stringify(o.accByCat)}});}
+      await Promise.all(removalPromises);
     }
   }
 
@@ -2125,16 +1990,15 @@ async function saveItemModal(){
     const name=`${CATS[cat].label} ${items.filter(i=>i.cat===cat).length+1}`;
     const newItem={id:'i'+Date.now(),name,cat,emoji:CATS[cat].emoji,img,seasons,conditions,occasion,unavailable,wornCount:0,lastWorn:''};
     items.push(newItem);
-    closeItemModal();
+    closeItemModal();renderWardrobe();showSaving();
+    await apiCall({action:'saveItem',data:newItem});
     if(CORE_CATS.includes(cat)){
       openCurateScreen(newItem.id);
     } else if(ACC_CATS.includes(cat)){
       openLinkOutfits(newItem.id);
     } else {
-      renderWardrobe();showToast('Item added!');
+      showToast('Item added!');
     }
-    showSaving();
-    await apiCall({action:'saveItem',data:newItem});
   }
 }
 
@@ -2149,10 +2013,9 @@ async function deleteCurrentItem(){
     const ids=affected.map(o=>o.id);
     items=items.filter(i=>i.id!==editingItemId);
     outfits=outfits.filter(o=>!ids.includes(o.id));
-    suggestionPages={};suggestionPageIndex={};
     closeItemModal();renderWardrobe();showSaving();
     await apiCall({action:'deleteItem',id:editingItemId});
-    for(const oid of ids){await apiCall({action:'deleteOutfit',id:oid});}
+    await Promise.all(ids.map(oid=>apiCall({action:'deleteOutfit',id:oid})));
     showToast('Item and outfits removed');
   } else {
     items=items.filter(i=>i.id!==editingItemId);
@@ -2197,18 +2060,16 @@ function closeCurateScreen(){
 function buildCurateSteps(itemId){
   const item=getItem(itemId);
   if(!item)return[];
-  const steps=[];
   const cat=item.cat;
-
+  const steps=[];
   if(cat==='tops'){
-    // Step 1: pick bottoms
-    steps.push({type:'pick',label:'Which bottoms work with this top?',pool:items.filter(i=>i.cat==='bottoms'),context:null,pairKey:null,nextFn:'topBottomPairs'});
+    steps.push({type:'pick',label:'Which bottoms work with this top?',pool:items.filter(i=>i.cat==='bottoms'&&!i.unavailable),nextFn:'topGotBottoms'});
   } else if(cat==='bottoms'){
-    steps.push({type:'pick',label:'Which tops work with this bottom?',pool:items.filter(i=>i.cat==='tops'),context:null,pairKey:null,nextFn:'bottomTopPairs'});
-  } else if(cat==='dresses'){
-    steps.push({type:'pick',label:'Which jumpers work over this dress?',pool:items.filter(i=>i.cat==='jumpers'),context:null,pairKey:null,nextFn:'dressSave'});
+    steps.push({type:'pick',label:'Which tops work with this bottom?',pool:items.filter(i=>i.cat==='tops'&&!i.unavailable),nextFn:'bottomGotTops'});
   } else if(cat==='jumpers'){
-    steps.push({type:'pick',label:'Which tops layer under this jumper?',pool:items.filter(i=>i.cat==='tops'),context:null,pairKey:null,nextFn:'jumperTopPairs'});
+    steps.push({type:'pick',label:'Which bottoms work with this jumper?',pool:items.filter(i=>i.cat==='bottoms'&&!i.unavailable),nextFn:'jumperGotBottoms'});
+  } else if(cat==='dresses'){
+    steps.push({type:'pick',label:'Which jumpers work over this dress?',pool:items.filter(i=>i.cat==='jumpers'&&!i.unavailable),nextFn:'dressFinal',isFinal:true});
   }
   return steps;
 }
@@ -2256,9 +2117,7 @@ function renderCurateStep(){
       ${it.img?`<img src="${it.img}" loading="lazy">`:`<span style="font-size:24px;">${it.emoji||'👕'}</span>`}
     </div>`).join('');
 
-  const willInjectMore=['topBottomPairs','bottomTopPairs','jumperTopPairs'].includes(curateSteps[curateStepIdx]?.nextFn);
-  const isReallyLast=!willInjectMore&&curateStepIdx===curateSteps.length-1&&curateSteps.length>1;
-  document.getElementById('curate-next-btn').textContent=isReallyLast?'Finish':'Next →';
+  document.getElementById('curate-next-btn').textContent=curateStepIdx===curateSteps.length-1?'Finish':'Next →';
 }
 
 function toggleCurateItem(id){
@@ -2272,108 +2131,77 @@ async function curateNext(){
   if(!step)return;
   const selected=[...curateSelected];
 
-  if(step.nextFn==='topBottomPairs'||step.nextFn==='bottomTopPairs'){
-    // For each selected bottom/top, add a jumper step
-    const isTop=step.nextFn==='topBottomPairs';
-    const newSteps=[];
-    selected.forEach((pairedId,i)=>{
-      const topId=isTop?curateItemId:pairedId;
-      const botId=isTop?pairedId:curateItemId;
-      // Save top+bottom outfit if not duplicate
-      const pieces=[topId,botId];
-      curateSavePair(pieces);
-      // Add jumper step for this pair
-      const jumpers=items.filter(j=>j.cat==='jumpers');
-      if(jumpers.length){
-        newSteps.push({
-          type:'pick',
-          label:'Add a jumper to this pair?',
-          pool:jumpers,
-          context:[topId,botId],
-          pairIdx:i,
-          totalPairs:selected.length,
-          nextFn:'saveWithJumper',
-          pairPieces:[topId,botId]
-        });
-      }
-    });
+  if(step.nextFn==='topGotBottoms'){
+    const newSteps=selected.map((botId,i)=>({
+      type:'pick',
+      label:'Which jumper completes this look?',
+      pool:items.filter(j=>j.cat==='jumpers'&&!j.unavailable),
+      context:[curateItemId,botId],
+      pairIdx:i,totalPairs:selected.length,
+      nextFn:'saveFinal',isFinal:true,
+      pairPieces:[curateItemId,botId]
+    }));
     curateSteps.splice(curateStepIdx+1,0,...newSteps);
-  } else if(step.nextFn==='jumperTopPairs'){
-    // For each selected top, add a bottom step
-    const newSteps=[];
-    selected.forEach((topId,i)=>{
-      const bottoms=items.filter(b=>b.cat==='bottoms');
-      if(bottoms.length){
-        newSteps.push({
-          type:'pick',
-          label:'Which bottoms complete this look?',
-          pool:bottoms,
-          context:[topId,curateItemId],
-          pairIdx:i,
-          totalPairs:selected.length,
-          nextFn:'saveJumperWithBottom',
-          pairPieces:[topId,curateItemId]
-        });
+
+  } else if(step.nextFn==='bottomGotTops'){
+    const newSteps=selected.map((topId,i)=>({
+      type:'pick',
+      label:'Which jumper completes this look?',
+      pool:items.filter(j=>j.cat==='jumpers'&&!j.unavailable),
+      context:[topId,curateItemId],
+      pairIdx:i,totalPairs:selected.length,
+      nextFn:'saveFinal',isFinal:true,
+      pairPieces:[topId,curateItemId]
+    }));
+    curateSteps.splice(curateStepIdx+1,0,...newSteps);
+
+  } else if(step.nextFn==='jumperGotBottoms'){
+    const newSteps=selected.map((botId,i)=>({
+      type:'pick',
+      label:'Which top completes this look?',
+      pool:items.filter(t=>t.cat==='tops'&&!t.unavailable),
+      context:[curateItemId,botId],
+      pairIdx:i,totalPairs:selected.length,
+      nextFn:'saveFinal',isFinal:true,
+      pairPieces:[curateItemId,botId]
+    }));
+    curateSteps.splice(curateStepIdx+1,0,...newSteps);
+
+  } else if(step.nextFn==='saveFinal'){
+    for(const id of selected){
+      const pieces=[...step.pairPieces,id];
+      if(!isDuplicateOutfit(pieces)){
+        curateSavePair(pieces);
+        const outfit=curateSavedOutfits[curateSavedOutfits.length-1];
+        showSaving();
+        await apiCall({action:'saveOutfit',data:{...outfit,accByCat:JSON.stringify(outfit.accByCat)}});
       }
-    });
-    // Also add dress step
-    const dresses=items.filter(d=>d.cat==='dresses');
-    if(dresses.length){
-      newSteps.push({
-        type:'pick',
-        label:'Which dresses work with this jumper?',
-        pool:dresses,
-        context:[curateItemId],
-        pairIdx:0,totalPairs:1,
-        nextFn:'dressSave',
-        pairPieces:[curateItemId]
-      });
     }
-    curateSteps.splice(curateStepIdx+1,0,...newSteps);
-  } else if(step.nextFn==='saveWithJumper'){
-    selected.forEach(jId=>{
-      const pieces=[...step.pairPieces,jId];
-      curateSavePair(pieces);
-    });
-  } else if(step.nextFn==='saveJumperWithBottom'){
-    selected.forEach(botId=>{
-      const pieces=[...step.pairPieces,botId];
-      curateSavePair(pieces);
-    });
-  } else if(step.nextFn==='dressSave'){
-    const isJumper=getItem(curateItemId)?.cat==='jumpers';
-    selected.forEach(id=>{
-      const pieces=isJumper?[id,curateItemId]:[curateItemId,id];
-      curateSavePair(pieces);
-    });
+
+  } else if(step.nextFn==='dressFinal'){
+    for(const jId of selected){
+      const pieces=[curateItemId,jId];
+      if(!isDuplicateOutfit(pieces)){
+        curateSavePair(pieces);
+        const outfit=curateSavedOutfits[curateSavedOutfits.length-1];
+        showSaving();
+        await apiCall({action:'saveOutfit',data:{...outfit,accByCat:JSON.stringify(outfit.accByCat)}});
+      }
+    }
   }
 
   curateStepIdx++;
   if(curateStepIdx>=curateSteps.length){
-    // Save all at once
-    if(curateSavedOutfits.length)showSaving();
     closeCurateScreen();
   } else {
+    curateSelected=new Set();
     renderCurateStep();
   }
 }
 
 function curateSkip(){
-  // If this step was meant to complete a pair (pairPieces exists),
-  // remove any outfit already saved with just those pieces
-  const step=curateSteps[curateStepIdx];
-  if(step&&step.pairPieces&&step.pairPieces.length){
-    const key=[...step.pairPieces].sort().join('|');
-    const toDelete=curateSavedOutfits.filter(o=>[...(o.pieces||[])].sort().join('|')===key);
-    toDelete.forEach(o=>{
-      curateSavedOutfits=curateSavedOutfits.filter(x=>x.id!==o.id);
-      outfits=outfits.filter(x=>x.id!==o.id);
-      apiCall({action:'deleteOutfit',id:o.id});
-    });
-  }
   curateStepIdx++;
   if(curateStepIdx>=curateSteps.length){
-    if(curateSavedOutfits.length)showSaving();
     closeCurateScreen();
   } else {
     curateSelected=new Set();
@@ -2386,12 +2214,6 @@ function curateSavePair(pieces){
   const outfit={id:'o'+Date.now()+Math.random().toString(36).slice(2),num:nextNum,pieces,accessories:[],accByCat:{},seasons:[],conditions:[],lastWorn:''};
   outfits.push(outfit);
   curateSavedOutfits.push(outfit);
-  // Save immediately rather than batching at the end
-  const curateTxt=document.getElementById('curate-saving-txt');
-  if(curateTxt)curateTxt.textContent='Saving...';
-  apiCall({action:'saveOutfit',data:{...outfit,accByCat:JSON.stringify(outfit.accByCat)}}).then(()=>{
-    if(curateTxt)curateTxt.textContent='';
-  });
 }
 
 // ===== BUILD =====
@@ -2623,7 +2445,7 @@ function renderCalendar(){
         thumbsHtml=buildFlatlay(tempId,true);
         outfits=outfits.filter(x=>x.id!==tempId);
       }
-    } else if((isFuture||isToday)&&fcast){
+    } else if(isFuture&&fcast){
       thumbsHtml=`<div style="font-size:14px;margin-top:2px;">${fcast.icon}</div>`;
     }
     const cls=['cal-day',isToday?'today':''].filter(Boolean).join(' ');
@@ -2808,7 +2630,7 @@ function openDayDetail(dateStr,isFuture){
 
   // ITEM 3: Multiple logged outfits side by side
   if(logs.length){
-    const weatherText=(!isFuture&&!isToday&&logs[0].weatherLabel)?`${logs[0].weatherLabel} · ${formatTemp(logs[0].tempC)}`:((isFuture||isToday)&&fcast?`${fcast.icon} ${fcast.label} · avg. ${formatTemp(fcast.tempC)}`:'');
+    const weatherText=(!isFuture&&logs[0].weatherLabel)?`${logs[0].tempC}°C · ${logs[0].weatherLabel}`:(isFuture&&fcast?`${fcast.icon} ${fcast.label}, ${fcast.tempC}°C`:'');
     document.getElementById('sheet-weather').textContent=weatherText;
     const row=document.createElement('div');
     row.className='logged-outfits-row';
@@ -2841,7 +2663,7 @@ function openDayDetail(dateStr,isFuture){
     });
     content.appendChild(row);
   } else {
-    document.getElementById('sheet-weather').textContent=(isFuture||isToday)&&fcast?`${fcast.icon} ${fcast.label} · avg. ${formatTemp(fcast.tempC)}`:'';
+    document.getElementById('sheet-weather').textContent=isFuture&&fcast?`${fcast.icon} ${fcast.label}, ${fcast.tempC}°C`:'';
   }
 
   // Suggestions — show for today and future only (not past)
@@ -2878,7 +2700,6 @@ function openDayDetail(dateStr,isFuture){
 async function deleteLog(logId,dateStr,isFuture){
   if(!confirm('Remove this outfit from the calendar?'))return;
   wornLogs=wornLogs.filter(l=>l.id!==logId);
-  suggestionPages={};suggestionPageIndex={};
   renderCalendar();
   closeDayDetail();
   openDayDetail(dateStr,isFuture);
