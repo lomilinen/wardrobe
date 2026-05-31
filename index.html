@@ -2081,7 +2081,12 @@ function openCurateScreen(itemId){
 function closeCurateScreen(){
   document.getElementById('curate-screen').classList.remove('open');
   curateItemId=null;curateSteps=[];curateStepIdx=0;curateSelected=new Set();
-  if(curateSavedOutfits.length)showToast(`Curation complete! ${curateSavedOutfits.length} outfit${curateSavedOutfits.length>1?'s':''} saved.`,3500);
+  if(curateSavedOutfits.length){
+    showToast(`Curation complete! ${curateSavedOutfits.length} outfit${curateSavedOutfits.length>1?'s':''} saved.`,3500);
+    curateSavedOutfits=[];
+  }
+  renderOutfits();
+  renderWardrobe();
 }
 
 function buildCurateSteps(itemId){
