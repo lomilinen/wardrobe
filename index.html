@@ -356,7 +356,6 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
   <div id="view-outfits" class="view">
     <div class="outfits-controls" style="flex-wrap:wrap;gap:6px;">
       <select class="wdropdown" id="outfits-sort-select" onchange="onOutfitsSortChange(this)">
-        <option value="">Default order</option>
         <option value="least">Least worn</option>
         <option value="most">Most worn</option>
         <option value="newest">Newest</option>
@@ -658,7 +657,11 @@ let outfitsTypeIdx=1; // default Everyday
 function onCatDropdownChange(sel){currentCat=sel.value;openWardrobeSection=null;renderWardrobe();}
 function onSortDropdownChange(sel){wardrobeSortIdx=Math.max(0,WARDROBE_SORTS.indexOf(sel.value));renderWardrobe();}
 function onTypeDropdownChange(sel){wardrobeTypeIdx=Math.max(0,WARDROBE_TYPES.indexOf(sel.value));renderWardrobe();}
-function onOutfitsSortChange(sel){outfitsSortIdx=Math.max(0,OUTFITS_SORTS.indexOf(sel.value));renderOutfits();}
+function onOutfitsSortChange(sel){
+  const idx=OUTFITS_SORTS.indexOf(sel.value);
+  outfitsSortIdx=idx>=0?idx:0;
+  renderOutfits();
+}
 function onOutfitsTypeChange(sel){outfitsTypeIdx=Math.max(0,OUTFITS_TYPES.indexOf(sel.value));renderOutfits();}
 
 async function bulkSetUnavailable(makeUnavailable){
@@ -1122,8 +1125,10 @@ function renderOutfits(){
   if(typeFilter==='unavailable')outfitsFiltered=outfitsFiltered.filter(o=>isUnavailableOutfit(o));
   if(sort==='newest'||sort==='oldest'){
     outfitsFiltered.sort((a,b)=>{
-      const aNum=a.num||0,bNum=b.num||0;
-      return sort==='newest'?bNum-aNum:aNum-bNum;
+      // IDs are 'o'+Date.now()+random — extract timestamp for reliable ordering
+      const aTs=parseInt((a.id||'').replace(/^o/,''))||0;
+      const bTs=parseInt((b.id||'').replace(/^o/,''))||0;
+      return sort==='newest'?bTs-aTs:aTs-bTs;
     });
   } else {
     outfitsFiltered.sort((a,b)=>{const d=sort==='most'?score(a)-score(b):score(b)-score(a);return d!==0?d:a.id.localeCompare(b.id);});
