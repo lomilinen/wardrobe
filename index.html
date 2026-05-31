@@ -1126,8 +1126,8 @@ function renderOutfits(){
   if(sort==='newest'||sort==='oldest'){
     outfitsFiltered.sort((a,b)=>{
       // IDs are 'o'+Date.now()+random — extract timestamp for reliable ordering
-      const aTs=parseInt((a.id||'').replace(/^o/,''))||0;
-      const bTs=parseInt((b.id||'').replace(/^o/,''))||0;
+      const aTs=parseInt(((a.id||'').replace(/^o/,'')).substring(0,13))||0;
+      const bTs=parseInt(((b.id||'').replace(/^o/,'')).substring(0,13))||0;
       return sort==='newest'?bTs-aTs:aTs-bTs;
     });
   } else {
@@ -1159,7 +1159,7 @@ function renderOutfitsPage(){
           ${isOcc?'<span class="sbadge badge-old">🎉 Occasion</span>':''}
           <span class="sbadge ${dUnworn>=14?'badge-old':'badge-ok'}">${dUnworn>=999?'never worn':dUnworn>=14?`⏳ ${dUnworn}d unworn`:'✓ Good rotation'}</span>
         </div>
-        <span style="font-size:9px;color:var(--ink-faint);opacity:.6;">#${o.num}</span>
+        <span style="font-size:9px;color:var(--ink-faint);opacity:.6;"></span>
       </div>
     </div>`;
   }).join('');
@@ -1187,7 +1187,7 @@ function openOutfitDetail(outfitId,returnTo){
   const o=outfits.find(x=>x.id===outfitId);
   if(!o)return;
   const isOcc=isOccasionOutfit(o);
-  document.getElementById('outfit-detail-title').textContent=isOcc?'🎉 Occasion outfit':'Outfit';
+  document.getElementById('outfit-detail-title').textContent=isOcc?`🎉 Occasion outfit #${o.num}`:`Outfit #${o.num}`;
   document.getElementById('outfit-detail-flatlay').innerHTML=buildFlatlayCore(outfitId);
 
   const accSummary=document.getElementById('outfit-detail-acc-summary');
@@ -1601,9 +1601,6 @@ function renderWardrobe(){
 
 // ITEM 6: 4 per row — done via CSS (.items-grid uses repeat(4,1fr))
 function itemCard(item){
-  const catItems=items.filter(i=>i.cat===item.cat);
-  const itemNum=catItems.findIndex(i=>i.id===item.id)+1;
-  const label=`${CATS[item.cat]?.label||''} ${itemNum}`;
   if(wardrobeSelectMode){
     const sel=wardrobeSelected.has(item.id);
     return`<div class="icard${item.unavailable?' icard-unavailable':''}${sel?' icard-selected':''}" onclick="toggleWardrobeItemSelect('${item.id}')" style="position:relative;">
@@ -1611,18 +1608,12 @@ function itemCard(item){
         ?`<div style="position:absolute;top:4px;right:4px;width:18px;height:18px;border-radius:50%;background:var(--sage);display:flex;align-items:center;justify-content:center;z-index:2;"><svg width='10' height='10' viewBox='0 0 10 10'><polyline points='1.5,5 4,7.5 8.5,2.5' stroke='%23fff' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg></div>`
         :`<div style="position:absolute;top:4px;right:4px;width:18px;height:18px;border-radius:50%;border:2px solid var(--border-mid);background:var(--warm);z-index:2;"></div>`}
       <div class="iimg">${item.img?`<img src="${item.img}" loading="lazy">`:`<span>${item.emoji||CATS[item.cat]?.emoji||'👕'}</span>`}</div>
-      <div class="imeta">
-        <div style="font-size:9px;color:var(--ink-faint);opacity:.6;margin-bottom:1px;">${label}</div>
-        <div class="iworn">${item.unavailable?'🚫 ':item.occasion?'🎉 ':''} ${item.wornCount||0}× · ${daysSinceLabel(item.lastWorn)}</div>
-      </div>
+      <div class="imeta"><div class="iworn">${item.unavailable?'🚫 ':item.occasion?'🎉 ':''} ${item.wornCount||0}× · ${daysSinceLabel(item.lastWorn)}</div></div>
     </div>`;
   }
   return`<div class="icard${item.unavailable?' icard-unavailable':''}" onclick="openEditModal('${item.id}')">
     <div class="iimg">${item.img?`<img src="${item.img}" loading="lazy">`:`<span>${item.emoji||CATS[item.cat]?.emoji||'👕'}</span>`}</div>
-    <div class="imeta">
-      <div style="font-size:9px;color:var(--ink-faint);opacity:.6;margin-bottom:1px;">${label}</div>
-      <div class="iworn">${item.unavailable?'🚫 ':item.occasion?'🎉 ':''} ${item.wornCount||0}× · ${daysSinceLabel(item.lastWorn)}</div>
-    </div>
+    <div class="imeta"><div class="iworn">${item.unavailable?'🚫 ':item.occasion?'🎉 ':''} ${item.wornCount||0}× · ${daysSinceLabel(item.lastWorn)}</div></div>
   </div>`;
 }
 
@@ -1815,7 +1806,9 @@ function openEditModal(id){
   editingItemId=id;
   pairedMarkedForRemoval=new Set();
   pairedPage_current=0;
-  document.getElementById('modal-title').textContent='Edit item';
+  const catItems=items.filter(i=>i.cat===item.cat);
+  const itemNum=catItems.findIndex(i=>i.id===id)+1;
+  document.getElementById('modal-title').textContent=`${CATS[item.cat]?.label||'Item'} ${itemNum}`;
   document.getElementById('iimg').value=item.img||'';
   document.getElementById('img-preview-box').innerHTML=item.img?`<img src="${item.img}" loading="lazy">`:'No photo';
   document.getElementById('icat').value=item.cat;
