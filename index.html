@@ -26,7 +26,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
 .header{display:flex;align-items:center;justify-content:space-between;margin-bottom:0.6rem;padding-bottom:0.5rem;border-bottom:1px solid var(--border);}
 .logo{font-family:'Cormorant Garamond',serif;font-size:26px;font-weight:400;}
 .logo em{font-style:italic;color:var(--ink-muted);}
-.wpill{display:flex;align-items:center;gap:6px;background:var(--warm);border:1px solid var(--border);border-radius:var(--rpill);padding:5px 13px;font-size:12px;color:var(--ink-soft);}
+.wpill{display:flex;flex-direction:column;align-items:flex-end;gap:1px;background:var(--warm);border:1px solid var(--border);border-radius:var(--rpill);padding:5px 13px;font-size:12px;color:var(--ink-soft);}
 .wdot{width:6px;height:6px;border-radius:50%;background:var(--sage);flex-shrink:0;}
 
 /* TABS */
@@ -278,7 +278,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
 <div class="app">
   <div class="header">
     <div class="logo">your <em>wardrobe</em></div>
-    <div class="wpill"><span class="wdot"></span><span id="wpill-txt">Loading weather...</span></div>
+    <div class="wpill" style="flex-direction:column;align-items:flex-end;gap:1px;"><span style="display:flex;align-items:center;gap:5px;"><span class="wdot"></span><span id="wpill-line1">Seattle · Loading...</span></span><span id="wpill-line2" style="font-size:11px;color:var(--ink-faint);padding-left:14px;"></span></div>
   </div>
   <div class="tabs">
     <button class="tab active" onclick="switchTab('calendar',this)">Calendar</button>
@@ -614,6 +614,13 @@ const SEASON_RANGES={
   mild:{min:13,max:20},
   warm:{min:20,max:99}
 };
+function toF(c){return Math.round(c*9/5+32);}
+function tempToBand(c){
+  if(c<5)return'Freezing';
+  if(c<13)return'Cold';
+  if(c<20)return'Mild';
+  return'Warm';
+}
 
 let items=[],outfits=[],wornLogs=[];
 let weather={tempC:null,condition:'',label:'',icon:'☁️'};
@@ -716,9 +723,10 @@ async function loadWeather(){
       icon:wmoToIcon(d.daily.weathercode[i]),
       label:wmoToLabel(d.daily.weathercode[i])
     }));
-    document.getElementById('wpill-txt').textContent=`Seattle · avg. ${avgTemp}°C · ${weather.label}`;
+    document.getElementById('wpill-line1').textContent=`Seattle · ${weather.icon} ${weather.label}`;
+    document.getElementById('wpill-line2').textContent=`avg. ${avgTemp}°C / ${toF(avgTemp)}°F · ${tempToBand(avgTemp)}`;
   }catch(e){
-    document.getElementById('wpill-txt').textContent='Seattle · weather unavailable';
+    document.getElementById('wpill-line1').textContent='Seattle · weather unavailable';
   }
 }
 function wmoToCondition(c){if(c>=55)return'rainy';return'';}
@@ -2650,7 +2658,7 @@ function openDayDetail(dateStr,isFuture){
 
   // ITEM 3: Multiple logged outfits side by side
   if(logs.length){
-    const weatherText=(!isFuture&&logs[0].weatherLabel)?`${logs[0].tempC}°C · ${logs[0].weatherLabel}`:(isFuture&&fcast?`${fcast.icon} ${fcast.label}, ${fcast.tempC}°C`:'');
+    const wT=logs[0];const weatherText=(!isFuture&&wT.weatherLabel)?`${wT.icon||''} ${wT.weatherLabel} · ${wT.tempC}°C / ${toF(wT.tempC)}°F · ${tempToBand(wT.tempC)}`:(((isFuture||isToday)&&fcast)?`${fcast.icon} ${fcast.label} · avg. ${fcast.tempC}°C / ${toF(fcast.tempC)}°F · ${tempToBand(fcast.tempC)}`:'');
     document.getElementById('sheet-weather').textContent=weatherText;
     const row=document.createElement('div');
     row.className='logged-outfits-row';
@@ -2685,8 +2693,7 @@ function openDayDetail(dateStr,isFuture){
   } else {
     // Show forecast for today too, not just future days
     const showFcast=(isFuture||isToday)&&fcast;
-    document.getElementById('sheet-weather').textContent=showFcast?`${fcast.icon} ${fcast.label}, avg. ${fcast.tempC}°C`:'';
-  }
+    document.getElementById('sheet-weather').textContent=showFcast?`${fcast.icon} ${fcast.label} · avg. ${fcast.tempC}°C / ${toF(fcast.tempC)}°F · ${tempToBand(fcast.tempC)}`:'';  }
 
   // Suggestions — show for today and future only (not past)
   const tempC=fcast?fcast.tempC:weather.tempC;
