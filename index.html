@@ -608,10 +608,10 @@ const RAINY_TAG_CATS=['bottoms','dresses','shoes','bags','coats','scarves'];
 const OCCASION_CATS=['tops','jumpers','bottoms','dresses','shoes','bags'];
 
 const SEASON_RANGES={
-  freezing:{min:-99,max:5},
-  cold:{min:5,max:13},
-  mild:{min:13,max:20},
-  warm:{min:20,max:99}
+  freezing:{min:-99,max:6},
+  cold:{min:6,max:12},
+  mild:{min:12,max:18},
+  warm:{min:18,max:99}
 };
 function toF(c){return Math.round(c*9/5+32);}
 function tempToBand(c){
@@ -709,25 +709,34 @@ function showSaving(){
 // ===== WEATHER =====
 async function loadWeather(){
   try{
-    // Fetch hourly data for daytime average (8am-8pm)
-    const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&hourly=temperature_2m,weathercode&daily=temperature_2m_max,weathercode&timezone=America%2FLos_Angeles&forecast_days=10`);
+    // Fetch hourly apparent_temperature and weathercode (8am-8pm daytime average)
+    const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&hourly=apparent_temperature,weathercode&daily=weathercode&timezone=America%2FLos_Angeles&forecast_days=10`);
     const d=await r.json();
-    // Calculate today's daytime average (hours 8-20)
-    const todayHours=d.hourly.time.map((t,i)=>({t,temp:d.hourly.temperature_2m[i],code:d.hourly.weathercode[i]}))
-      .filter(h=>{const hr=new Date(h.t).getHours();return hr>=8&&hr<=20;})
-      .filter(h=>h.t.startsWith(d.daily.time[0]));
-    const avgTemp=todayHours.length?Math.round(todayHours.reduce((s,h)=>s+h.temp,0)/todayHours.length):Math.round(d.daily.temperature_2m_max[0]);
-    // Worst daytime condition (highest WMO code = worst)
-    const worstCode=todayHours.length?Math.max(...todayHours.map(h=>h.code)):d.daily.weathercode[0];
+    // Helper: get daytime avg feels-like for a given date string
+    function dayAvgFeelsLike(dateStr){
+      const hrs=d.hourly.time.map((t,i)=>({t,temp:d.hourly.apparent_temperature[i],code:d.hourly.weathercode[i]}))
+        .filter(h=>{const hr=new Date(h.t).getHours();return hr>=8&&hr<=20;})
+        .filter(h=>h.t.startsWith(dateStr));
+      return hrs.length?{
+        temp:Math.round(hrs.reduce((s,h)=>s+h.temp,0)/hrs.length),
+        code:Math.max(...hrs.map(h=>h.code))
+      }:{temp:null,code:d.daily.weathercode[0]};
+    }
+    // Today
+    const today=d.daily.time[0];
+    const todayAvg=dayAvgFeelsLike(today);
+    const avgTemp=todayAvg.temp!==null?todayAvg.temp:10;
+    const worstCode=todayAvg.code;
     weather={tempC:avgTemp,condition:wmoToCondition(worstCode),label:wmoToLabel(worstCode),icon:wmoToIcon(worstCode)};
-    forecast=d.daily.time.map((date,i)=>({
-      date,tempC:Math.round(d.daily.temperature_2m_max[i]),
-      condition:wmoToCondition(d.daily.weathercode[i]),
-      icon:wmoToIcon(d.daily.weathercode[i]),
-      label:wmoToLabel(d.daily.weathercode[i])
-    }));
+    // All forecast days — each uses its own daytime feels-like average
+    forecast=d.daily.time.map((date,i)=>{
+      const avg=dayAvgFeelsLike(date);
+      const tempC=avg.temp!==null?avg.temp:10;
+      const code=avg.code||d.daily.weathercode[i];
+      return{date,tempC,condition:wmoToCondition(code),icon:wmoToIcon(code),label:wmoToLabel(code)};
+    });
     document.getElementById('wpill-line1').textContent=`Seattle · ${weather.icon} ${weather.label}`;
-    document.getElementById('wpill-line2').textContent=`avg. ${avgTemp}°C / ${toF(avgTemp)}°F · ${tempToBand(avgTemp)}`;
+    document.getElementById('wpill-line2').textContent=`avg. feels like ${avgTemp}°C / ${toF(avgTemp)}°F · ${tempToBand(avgTemp)}`;
   }catch(e){
     document.getElementById('wpill-line1').textContent='Seattle · weather unavailable';
   }
@@ -898,7 +907,7 @@ function outfitMatchesTempFilter(o,band){
       return(it.conditions||[]).includes('rainy');
     });
   }
-  return(o.pieces||[]).some(pid=>{const it=getItem(pid);return it&&(it.seasons||[]).includes(band);});
+  return(o.pieces||[]).every(pid=>{const it=getItem(pid);if(!it)return true;const s=it.seasons||[];if(!s.length)return true;return s.includes(band);});
 }
 
 // ===== ITEM 4: Infer outfit's effective season from selected core pieces (intersection) =====
@@ -2696,7 +2705,7 @@ function openDayDetail(dateStr,isFuture){
   } else {
     // Show forecast for today too, not just future days
     const showFcast=(isFuture||isToday)&&fcast;
-    document.getElementById('sheet-weather').textContent=showFcast?`${fcast.icon} ${fcast.label} · avg. ${fcast.tempC}°C / ${toF(fcast.tempC)}°F · ${tempToBand(fcast.tempC)}`:'';  }
+    document.getElementById('sheet-weather').textContent=showFcast?`${fcast.icon} ${fcast.label} · avg. feels like ${fcast.tempC}°C / ${toF(fcast.tempC)}°F · ${tempToBand(fcast.tempC)}`:'';  }
 
   // Suggestions — show for today and future only (not past)
   const tempC=fcast?fcast.tempC:weather.tempC;
