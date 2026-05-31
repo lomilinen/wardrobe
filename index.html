@@ -611,8 +611,8 @@ const OCCASION_CATS=['tops','jumpers','bottoms','dresses','shoes','bags'];
 const SEASON_RANGES={
   freezing:{min:-99,max:5},
   cold:{min:5,max:13},
-  mild:{min:13,max:23},
-  warm:{min:23,max:99}
+  mild:{min:13,max:20},
+  warm:{min:20,max:99}
 };
 
 let items=[],outfits=[],wornLogs=[];
@@ -699,24 +699,30 @@ function showSaving(){
 // ===== WEATHER =====
 async function loadWeather(){
   try{
-    const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&current=temperature_2m,weathercode&daily=temperature_2m_max,weathercode&timezone=America%2FLos_Angeles&forecast_days=10`);
+    // Fetch hourly data for daytime average (8am-8pm)
+    const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&hourly=temperature_2m,weathercode&daily=temperature_2m_max,weathercode&timezone=America%2FLos_Angeles&forecast_days=10`);
     const d=await r.json();
-    const tempC=Math.round(d.current.temperature_2m);
-    const code=d.current.weathercode;
-    weather={tempC,condition:wmoToCondition(code),label:wmoToLabel(code),icon:wmoToIcon(code)};
+    // Calculate today's daytime average (hours 8-20)
+    const todayHours=d.hourly.time.map((t,i)=>({t,temp:d.hourly.temperature_2m[i],code:d.hourly.weathercode[i]}))
+      .filter(h=>{const hr=new Date(h.t).getHours();return hr>=8&&hr<=20;})
+      .filter(h=>h.t.startsWith(d.daily.time[0]));
+    const avgTemp=todayHours.length?Math.round(todayHours.reduce((s,h)=>s+h.temp,0)/todayHours.length):Math.round(d.daily.temperature_2m_max[0]);
+    // Worst daytime condition (highest WMO code = worst)
+    const worstCode=todayHours.length?Math.max(...todayHours.map(h=>h.code)):d.daily.weathercode[0];
+    weather={tempC:avgTemp,condition:wmoToCondition(worstCode),label:wmoToLabel(worstCode),icon:wmoToIcon(worstCode)};
     forecast=d.daily.time.map((date,i)=>({
       date,tempC:Math.round(d.daily.temperature_2m_max[i]),
       condition:wmoToCondition(d.daily.weathercode[i]),
       icon:wmoToIcon(d.daily.weathercode[i]),
       label:wmoToLabel(d.daily.weathercode[i])
     }));
-    document.getElementById('wpill-txt').textContent=`Seattle · ${tempC}°C · ${weather.label}`;
+    document.getElementById('wpill-txt').textContent=`Seattle · avg. ${avgTemp}°C · ${weather.label}`;
   }catch(e){
     document.getElementById('wpill-txt').textContent='Seattle · weather unavailable';
   }
 }
-function wmoToCondition(c){if(c>=51)return'rainy';return'';}
-function wmoToIcon(c){if(c<=1)return'☀️';if(c<=3)return'☁️';if(c>=51)return'🌧️';return'☁️';}
+function wmoToCondition(c){if(c>=55)return'rainy';return'';}
+function wmoToIcon(c){if(c<=1)return'☀️';if(c<=3)return'☁️';if(c>=55)return'🌧️';return'☁️';}
 function wmoToLabel(c){
   if(c===0)return'Clear sky';if(c<=2)return'Partly cloudy';if(c<=3)return'Overcast';
   if(c<=48)return'Foggy';if(c<=67)return'Rainy';if(c<=77)return'Snowy';
@@ -1254,6 +1260,7 @@ async function confirmWornFromDetail(){
   const allWorn=[...o.pieces,...chosenAccs];
   allWorn.forEach(pid=>{const it=getItem(pid);if(it){it.lastWorn=new Date().toISOString();it.wornCount=(it.wornCount||0)+1;}});
   wornLogs.push(log);
+  suggestionCache={};
   closeDatePickScreen();
   closeOutfitDetail();
   renderCalendar();
@@ -1969,6 +1976,7 @@ async function saveItemModal(){
     if(g==='season')seasons.push(v);
     if(g==='condition')conditions.push(v);
   });
+  if(!seasons.length){showToast('Please select at least one season tag');return;}
   const occasion=OCCASION_CATS.includes(cat)&&document.getElementById('occasion-tog').classList.contains('active');
   const unavailable=document.getElementById('unavailable-tog').classList.contains('active');
   const item=items.find(i=>i.id===editingItemId);
@@ -2128,7 +2136,7 @@ function renderCurateStep(){
       ${it.img?`<img src="${it.img}" loading="lazy">`:`<span style="font-size:24px;">${it.emoji||'👕'}</span>`}
     </div>`).join('');
 
-  document.getElementById('curate-next-btn').textContent=curateStepIdx===curateSteps.length-1?'Finish':'Next →';
+  document.getElementById('curate-next-btn').textContent=step.isFinal?'Finish':'Next →';
 }
 
 function toggleCurateItem(id){
@@ -2486,6 +2494,7 @@ function isUnavailableOutfit(o){
 // Keyed by dateStr, resets at midnight
 let suggestionPages={};
 let suggestionPageIndex={};
+let suggestionCache={}; // cleared on log/delete/item-delete
 let suggestionPageDateKey='';
 
 function getSuggestionPages(pool,dateStr){
@@ -2674,7 +2683,9 @@ function openDayDetail(dateStr,isFuture){
     });
     content.appendChild(row);
   } else {
-    document.getElementById('sheet-weather').textContent=isFuture&&fcast?`${fcast.icon} ${fcast.label}, ${fcast.tempC}°C`:'';
+    // Show forecast for today too, not just future days
+    const showFcast=(isFuture||isToday)&&fcast;
+    document.getElementById('sheet-weather').textContent=showFcast?`${fcast.icon} ${fcast.label}, avg. ${fcast.tempC}°C`:'';
   }
 
   // Suggestions — show for today and future only (not past)
@@ -2711,6 +2722,7 @@ function openDayDetail(dateStr,isFuture){
 async function deleteLog(logId,dateStr,isFuture){
   if(!confirm('Remove this outfit from the calendar?'))return;
   wornLogs=wornLogs.filter(l=>l.id!==logId);
+  suggestionCache={}; // clear so suggestions recalculate
   renderCalendar();
   closeDayDetail();
   openDayDetail(dateStr,isFuture);
