@@ -722,14 +722,18 @@ async function loadWeather(){
         code:Math.max(...hrs.map(h=>h.code))
       }:{temp:null,code:d.daily.weathercode[0]};
     }
-    // Today
+    // Today — calculate once, reuse in both pill and forecast
     const today=d.daily.time[0];
     const todayAvg=dayAvgFeelsLike(today);
     const avgTemp=todayAvg.temp!==null?todayAvg.temp:10;
     const worstCode=todayAvg.code;
     weather={tempC:avgTemp,condition:wmoToCondition(worstCode),label:wmoToLabel(worstCode),icon:wmoToIcon(worstCode)};
-    // All forecast days — each uses its own daytime feels-like average
+    // All forecast days — today reuses weather object, future days calculate their own
     forecast=d.daily.time.map((date,i)=>{
+      if(i===0){
+        // Reuse today's already-calculated values — guaranteed same as pill
+        return{date,tempC:avgTemp,condition:weather.condition,icon:weather.icon,label:weather.label};
+      }
       const avg=dayAvgFeelsLike(date);
       const tempC=avg.temp!==null?avg.temp:10;
       const code=avg.code||d.daily.weathercode[i];
