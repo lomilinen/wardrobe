@@ -272,6 +272,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
 .curate-actions{display:flex;gap:10px;}
 .curate-skip-btn{flex:1;padding:12px;border-radius:var(--rsm);border:1px solid var(--border);background:none;font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif;color:var(--ink-soft);}
 .curate-next-btn{flex:2;padding:12px;border-radius:var(--rsm);border:none;background:var(--ink);color:var(--warm);font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;}
+.curate-next-btn:disabled{opacity:.35;cursor:not-allowed;}
 </style>
 </head>
 <body>
@@ -2106,13 +2107,13 @@ function buildCurateSteps(itemId){
   const cat=item.cat;
   const steps=[];
   if(cat==='tops'){
-    steps.push({type:'pick',label:'Which bottoms work with this top?',pool:items.filter(i=>i.cat==='bottoms'&&!i.unavailable),nextFn:'topGotBottoms'});
+    steps.push({type:'pick',label:'Which bottoms work with this top?',pool:items.filter(i=>i.cat==='bottoms'),nextFn:'topGotBottoms'});
   } else if(cat==='bottoms'){
-    steps.push({type:'pick',label:'Which tops work with this bottom?',pool:items.filter(i=>i.cat==='tops'&&!i.unavailable),nextFn:'bottomGotTops'});
+    steps.push({type:'pick',label:'Which tops work with this bottom?',pool:items.filter(i=>i.cat==='tops'),nextFn:'bottomGotTops'});
   } else if(cat==='jumpers'){
-    steps.push({type:'pick',label:'Which bottoms work with this jumper?',pool:items.filter(i=>i.cat==='bottoms'&&!i.unavailable),nextFn:'jumperGotBottoms'});
+    steps.push({type:'pick',label:'Which bottoms work with this jumper?',pool:items.filter(i=>i.cat==='bottoms'),nextFn:'jumperGotBottoms'});
   } else if(cat==='dresses'){
-    steps.push({type:'pick',label:'Which jumpers work over this dress?',pool:items.filter(i=>i.cat==='jumpers'&&!i.unavailable),nextFn:'dressFinal',isFinal:true});
+    steps.push({type:'pick',label:'Which jumpers work over this dress?',pool:items.filter(i=>i.cat==='jumpers'),nextFn:'dressFinal',isFinal:true});
   }
   return steps;
 }
@@ -2161,12 +2162,14 @@ function renderCurateStep(){
     </div>`).join('');
 
   document.getElementById('curate-next-btn').textContent=step.isFinal?'Finish':'Next →';
+  document.getElementById('curate-next-btn').disabled=true;
 }
 
 function toggleCurateItem(id){
   if(curateSelected.has(id))curateSelected.delete(id);
   else curateSelected.add(id);
   document.getElementById(`ci-${id}`)?.classList.toggle('selected',curateSelected.has(id));
+  document.getElementById('curate-next-btn').disabled=curateSelected.size===0;
 }
 
 async function curateNext(){
@@ -2178,7 +2181,7 @@ async function curateNext(){
     const newSteps=selected.map((botId,i)=>({
       type:'pick',
       label:'Which jumper completes this look?',
-      pool:items.filter(j=>j.cat==='jumpers'&&!j.unavailable),
+      pool:items.filter(j=>j.cat==='jumpers'),
       context:[curateItemId,botId],
       pairIdx:i,totalPairs:selected.length,
       nextFn:'saveFinal',isFinal:true,
@@ -2190,7 +2193,7 @@ async function curateNext(){
     const newSteps=selected.map((topId,i)=>({
       type:'pick',
       label:'Which jumper completes this look?',
-      pool:items.filter(j=>j.cat==='jumpers'&&!j.unavailable),
+      pool:items.filter(j=>j.cat==='jumpers'),
       context:[topId,curateItemId],
       pairIdx:i,totalPairs:selected.length,
       nextFn:'saveFinal',isFinal:true,
@@ -2202,7 +2205,7 @@ async function curateNext(){
     const newSteps=selected.map((botId,i)=>({
       type:'pick',
       label:'Which top completes this look?',
-      pool:items.filter(t=>t.cat==='tops'&&!t.unavailable),
+      pool:items.filter(t=>t.cat==='tops'),
       context:[curateItemId,botId],
       pairIdx:i,totalPairs:selected.length,
       nextFn:'saveFinal',isFinal:true,
