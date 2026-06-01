@@ -740,7 +740,7 @@ async function loadWeather(){
       return{date,tempC,condition:wmoToCondition(code),icon:wmoToIcon(code),label:wmoToLabel(code)};
     });
     document.getElementById('wpill-line1').textContent=`Seattle · ${weather.icon} ${weather.label}`;
-    document.getElementById('wpill-line2').textContent=`avg. feels like ${avgTemp}°C / ${toF(avgTemp)}°F · ${tempToBand(avgTemp)}`;
+    document.getElementById('wpill-line2').textContent=`avg. fl. ${avgTemp}°C / ${toF(avgTemp)}°F · ${tempToBand(avgTemp)}`;
   }catch(e){
     document.getElementById('wpill-line1').textContent='Seattle · weather unavailable';
   }
@@ -2674,7 +2674,7 @@ function openDayDetail(dateStr,isFuture){
 
   // ITEM 3: Multiple logged outfits side by side
   if(logs.length){
-    const wT=logs[0];const weatherText=(!isFuture&&wT.weatherLabel)?`${wT.icon||''} ${wT.weatherLabel} · ${wT.tempC}°C / ${toF(wT.tempC)}°F · ${tempToBand(wT.tempC)}`:(((isFuture||isToday)&&fcast)?`${fcast.icon} ${fcast.label} · avg. ${fcast.tempC}°C / ${toF(fcast.tempC)}°F · ${tempToBand(fcast.tempC)}`:'');
+    const wT=logs[0];const weatherText=(!isFuture&&wT.weatherLabel)?`${wT.icon||''} ${wT.weatherLabel} · ${wT.tempC}°C / ${toF(wT.tempC)}°F · ${tempToBand(wT.tempC)}`:(((isFuture||isToday)&&fcast)?`${fcast.icon} ${fcast.label} · avg. feels like ${fcast.tempC}°C / ${toF(fcast.tempC)}°F · ${tempToBand(fcast.tempC)}`:'');
     document.getElementById('sheet-weather').textContent=weatherText;
     const row=document.createElement('div');
     row.className='logged-outfits-row';
