@@ -2774,18 +2774,73 @@ function openDayDetail(dateStr,isFuture){
 
 async function deleteLog(logId,dateStr,isFuture){
   if(!confirm('Remove this outfit from the calendar?'))return;
+  const log=wornLogs.find(l=>l.id===logId);
+  if(!log)return;
+
+  // Remove log first
   wornLogs=wornLogs.filter(l=>l.id!==logId);
-  suggestionCache={}; // clear so suggestions recalculate
+  suggestionCache={};
+
+  // Recalculate outfit lastWorn from remaining logs
+  const outfit=outfits.find(o=>o.id===log.outfitId);
+  if(outfit){
+    const outfitLogs=wornLogs.filter(l=>l.outfitId===outfit.id);
+    outfit.lastWorn=outfitLogs.length
+      ?outfitLogs.reduce((latest,l)=>l.date>latest?l.date:latest,'')
+      :'';
+  }
+
+  // Recalculate wornCount and lastWorn for every item referenced in the deleted log
+  const affectedItemIds=[...new Set([...(log.pieces||[]),...(log.accessories||[])])];
+  const updatedItems=[];
+  affectedItemIds.forEach(itemId=>{
+    const item=getItem(itemId);
+    if(!item)return;
+    const itemLogs=wornLogs.filter(l=>[...(l.pieces||[]),...(l.accessories||[])].includes(itemId));
+    item.wornCount=itemLogs.length;
+    item.lastWorn=itemLogs.length
+      ?itemLogs.reduce((latest,l)=>l.date>latest?l.date:latest,'')
+      :'';
+    updatedItems.push(item);
+  });
+
   renderCalendar();
   closeDayDetail();
   openDayDetail(dateStr,isFuture);
   showSaving();
-  await apiCall({action:'deleteLog',id:logId});
+
+  const savePromises=[apiCall({action:'deleteLog',id:logId})];
+  if(outfit)savePromises.push(apiCall({action:'updateOutfit',data:{...outfit,accByCat:JSON.stringify(outfit.accByCat)}}));
+  updatedItems.forEach(item=>savePromises.push(apiCall({action:'updateItem',data:item})));
+  await Promise.all(savePromises);
   showToast('Removed from calendar');
 }
 
 function closeDayDetail(){document.getElementById('day-detail').classList.remove('open');}
 
+
+// ===== RECALCULATE WORN STATS (run recalculateWornStats() from console to fix historical data) =====
+async function recalculateWornStats(){
+  console.log("Recalculating worn stats from logs...");
+  const savePromises=[];
+  outfits.filter(o=>o.id!=="__preview__").forEach(outfit=>{
+    const outfitLogs=wornLogs.filter(l=>l.outfitId===outfit.id);
+    outfit.lastWorn=outfitLogs.length?outfitLogs.reduce((latest,l)=>l.date>latest?l.date:latest,""):"";
+    savePromises.push(apiCall({action:"updateOutfit",data:{...outfit,accByCat:JSON.stringify(outfit.accByCat)}}));
+  });
+  items.forEach(item=>{
+    const itemLogs=wornLogs.filter(l=>[...(l.pieces||[]),...(l.accessories||[])].includes(item.id));
+    item.wornCount=itemLogs.length;
+    item.lastWorn=itemLogs.length?itemLogs.reduce((latest,l)=>l.date>latest?l.date:latest,""):"";
+    savePromises.push(apiCall({action:"updateItem",data:item}));
+  });
+  showSaving();
+  await Promise.all(savePromises);
+  renderWardrobe();
+  renderOutfits();
+  showToast("Worn stats recalculated!");
+  console.log("Done.");
+}
 // ===== EVENTS =====
 document.getElementById('day-detail').addEventListener('click',e=>{if(e.target===document.getElementById('day-detail'))closeDayDetail();});
 document.getElementById('item-modal').addEventListener('click',e=>{if(e.target===document.getElementById('item-modal'))closeItemModal();});
