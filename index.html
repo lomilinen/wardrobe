@@ -1707,10 +1707,10 @@ function initSwipe(el,onLeft,onRight){
 }
 
 function navigateOutfitDetail(dir){
-  if(!outfitsFiltered.length)return;
-  const idx=outfitsFiltered.findIndex(o=>o.id===currentOutfitDetailId);
+  let pool=outfitsFiltered.length?outfitsFiltered:outfits.filter(o=>o.id!=='__preview__');
+  const idx=pool.findIndex(o=>o.id===currentOutfitDetailId);
   if(idx===-1)return;
-  const next=outfitsFiltered[idx+dir];
+  const next=pool[idx+dir];
   if(next)openOutfitDetail(next.id,outfitDetailReturnTo);
 }
 
@@ -1718,9 +1718,10 @@ function navigateItemModal(dir){
   const currentItem=items.find(i=>i.id===editingItemId);
   if(!currentItem)return;
   const typeFilter=WARDROBE_TYPES[wardrobeTypeIdx]||'';
+  const sortVal=WARDROBE_SORTS[wardrobeSortIdx]||'';
   const tempFilters=[...wardrobeWeatherFilters].filter(f=>f!=='rainy');
   const rainFilter=wardrobeWeatherFilters.has('rainy');
-  // Always navigate within the same category
+  const getOutfitCount=itemId=>outfits.filter(o=>(o.pieces||[]).includes(itemId)||Object.values(o.accByCat||{}).flat().includes(itemId)).length;
   let pool=items.filter(i=>i.cat===currentItem.cat).filter(i=>{
     if(tempFilters.length&&!tempFilters.some(tf=>(i.seasons||[]).includes(tf)))return false;
     if(rainFilter&&RAINY_TAG_CATS.includes(i.cat)&&!(i.conditions||[]).includes('rainy'))return false;
@@ -1729,6 +1730,15 @@ function navigateItemModal(dir){
     if(typeFilter==='unavailable'&&!i.unavailable)return false;
     return true;
   });
+  if(sortVal){
+    pool=pool.slice().sort((a,b)=>{
+      if(sortVal==='most-worn')return(b.wornCount||0)-(a.wornCount||0);
+      if(sortVal==='least-worn')return(a.wornCount||0)-(b.wornCount||0);
+      if(sortVal==='most-outfits')return getOutfitCount(b.id)-getOutfitCount(a.id);
+      if(sortVal==='least-outfits')return getOutfitCount(a.id)-getOutfitCount(b.id);
+      return 0;
+    });
+  }
   const idx=pool.findIndex(i=>i.id===editingItemId);
   if(idx===-1)return;
   const next=pool[idx+dir];
