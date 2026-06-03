@@ -1163,7 +1163,7 @@ function renderOutfitsPage(){
 
   list.innerHTML=page.map(o=>{
     const isOcc=isOccasionOutfit(o);
-    const dUnworn=daysSince(o.lastWorn);
+    const outfitWornCount=wornLogs.filter(l=>l.outfitId===o.id).length;
     const isSelected=outfitSelected.has(o.id);
     return`<div class="outfit-card${isSelected?' outfit-card-selected':''}" onclick="${outfitSelectMode?`toggleOutfitSelect('${o.id}')`:`openOutfitDetail('${o.id}','outfits')`}">
       ${outfitSelectMode?`<div style="position:absolute;top:5px;left:5px;width:18px;height:18px;border-radius:50%;background:${isSelected?'var(--sage)':'var(--warm)'};border:2px solid ${isSelected?'var(--sage)':'var(--border-mid)'};z-index:2;"></div>`:''}
@@ -1171,9 +1171,9 @@ function renderOutfitsPage(){
       <div class="outfit-card-foot">
         <div class="outfit-card-badges">
           ${isOcc?'<span class="sbadge badge-old">🎉 Occasion</span>':''}
-          <span class="sbadge ${dUnworn>=14?'badge-old':'badge-ok'}">${dUnworn>=999?'never worn':dUnworn>=14?`⏳ ${dUnworn}d unworn`:'✓ Good rotation'}</span>
+          
         </div>
-        <span style="font-size:9px;color:var(--ink-faint);opacity:.6;"></span>
+        <div class="iworn">${outfitWornCount}× · ${daysSinceLabel(o.lastWorn)}</div>
       </div>
     </div>`;
   }).join('');
