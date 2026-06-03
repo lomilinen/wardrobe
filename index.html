@@ -1692,18 +1692,23 @@ document.addEventListener('click',e=>{
 let swipeStartX=0,swipeStartY=0;
 
 function initSwipe(el,onLeft,onRight){
-  el.addEventListener('touchstart',e=>{
+  // Remove old listeners before adding new ones to prevent stacking
+  if(el._swipeStart){el.removeEventListener('touchstart',el._swipeStart);}
+  if(el._swipeEnd){el.removeEventListener('touchend',el._swipeEnd);}
+  el._swipeStart=e=>{
     swipeStartX=e.touches[0].clientX;
     swipeStartY=e.touches[0].clientY;
-  },{passive:true});
-  el.addEventListener('touchend',e=>{
+  };
+  el._swipeEnd=e=>{
     const dx=e.changedTouches[0].clientX-swipeStartX;
     const dy=e.changedTouches[0].clientY-swipeStartY;
     if(Math.abs(dx)>60&&Math.abs(dx)>Math.abs(dy)*1.5){
       if(dx<0)onLeft();
       else onRight();
     }
-  },{passive:true});
+  };
+  el.addEventListener('touchstart',el._swipeStart,{passive:true});
+  el.addEventListener('touchend',el._swipeEnd,{passive:true});
 }
 
 function navigateOutfitDetail(dir){
