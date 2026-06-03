@@ -448,7 +448,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
   <div id="outfit-detail-acc-summary" style="margin-bottom:1rem;"></div>
   <div class="detail-actions">
     <button class="btn-danger" onclick="deleteOutfitFromDetail()">Delete</button>
-    <button class="btn-outline" onclick="openEditAccFromDetail()">Edit accessories</button>
+    <button class="btn-outline" onclick="editingLogId=null;openEditAccFromDetail()">Edit accessories</button>
     <button class="btn-dark" onclick="wearOutfitFromDetail()">Wearing this</button>
   </div>
 </div>
@@ -1301,13 +1301,27 @@ async function confirmWornFromDetail(){
 }
 
 // ===== ITEM 5: Edit Accessories — accordion per category + item 4 season greying =====
+function closeEditAcc(){
+  document.getElementById('edit-acc-screen').classList.remove('open');
+}
+
 function openEditAccFromDetail(){
   if(!currentOutfitDetailId)return;
   const o=outfits.find(x=>x.id===currentOutfitDetailId);
   if(!o)return;
   editAccOutfitId=currentOutfitDetailId;
   editAccState={};
-  ACC_CATS.forEach(cat=>{editAccState[cat]=[...(o.accByCat[cat]||[])];});
+  // If editing a log, pre-select what was actually worn that day
+  // If editing the outfit itself, pre-select all linked accessories
+  if(editingLogId){
+    const log=wornLogs.find(l=>l.id===editingLogId);
+    const wornAccs=log?log.accessories||[]:[];
+    ACC_CATS.forEach(cat=>{
+      editAccState[cat]=wornAccs.filter(id=>{const it=getItem(id);return it&&it.cat===cat;});
+    });
+  } else {
+    ACC_CATS.forEach(cat=>{editAccState[cat]=[...(o.accByCat[cat]||[])];});
+  }
 
   // Infer outfit seasons from core pieces for greying
   const outfitSeasons=inferOutfitSeasons(o.pieces||[]);
@@ -1407,8 +1421,9 @@ function editLogAccFromSheet(logId,outfitId){
   const o=outfits.find(x=>x.id===outfitId);
   if(!log||!o)return;
   editingLogId=logId;
+  currentOutfitDetailId=outfitId;
   closeDayDetail();
-  openWearing(outfitId,log.date);
+  openEditAccFromDetail();
 }
 
 async function saveEditAccForLog(){
@@ -2112,6 +2127,7 @@ function buildCurateSteps(itemId){
     steps.push({type:'pick',label:'Which tops work with this bottom?',pool:items.filter(i=>i.cat==='tops'),nextFn:'bottomGotTops'});
   } else if(cat==='jumpers'){
     steps.push({type:'pick',label:'Which bottoms work with this jumper?',pool:items.filter(i=>i.cat==='bottoms'),nextFn:'jumperGotBottoms'});
+    steps.push({type:'pick',label:'Which dresses work with this jumper?',pool:items.filter(i=>i.cat==='dresses'),nextFn:'jumperGotDresses',isFinal:true});
   } else if(cat==='dresses'){
     steps.push({type:'pick',label:'Which jumpers work over this dress?',pool:items.filter(i=>i.cat==='jumpers'),nextFn:'dressFinal',isFinal:true});
   }
@@ -2216,6 +2232,17 @@ async function curateNext(){
   } else if(step.nextFn==='saveFinal'){
     for(const id of selected){
       const pieces=[...step.pairPieces,id];
+      if(!isDuplicateOutfit(pieces)){
+        curateSavePair(pieces);
+        const outfit=curateSavedOutfits[curateSavedOutfits.length-1];
+        showSaving();
+        await apiCall({action:'saveOutfit',data:{...outfit,accByCat:JSON.stringify(outfit.accByCat)}});
+      }
+    }
+
+  } else if(step.nextFn==='jumperGotDresses'){
+    for(const dId of selected){
+      const pieces=[dId,curateItemId];
       if(!isDuplicateOutfit(pieces)){
         curateSavePair(pieces);
         const outfit=curateSavedOutfits[curateSavedOutfits.length-1];
