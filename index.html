@@ -2330,7 +2330,7 @@ function curateSkip(){
 }
 
 function curateSavePair(pieces){
-  const nextNum=outfits.filter(x=>x.id!=='__preview__').length+1+curateSavedOutfits.length;
+  const nextNum=outfits.filter(x=>x.id!=='__preview__').length+1;
   const outfit={id:'o'+Date.now()+Math.random().toString(36).slice(2),num:nextNum,pieces,accessories:[],accByCat:{},seasons:[],conditions:[],lastWorn:''};
   outfits.push(outfit);
   curateSavedOutfits.push(outfit);
