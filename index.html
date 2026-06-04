@@ -242,6 +242,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
 .toast.show{transform:translateX(-50%) translateY(0);}
 .saving{position:fixed;top:1rem;right:1rem;font-size:11px;color:var(--ink-faint);background:var(--warm);border:1px solid var(--border);border-radius:var(--rpill);padding:4px 10px;z-index:50;opacity:0;transition:opacity .3s;}
 .saving.show{opacity:1;}
+.saving-overlay{display:none;position:fixed;inset:0;background:rgba(26,23,20,.6);z-index:300;align-items:center;justify-content:center;flex-direction:column;gap:14px;}
+.saving-overlay.show{display:flex;}
+.saving-overlay-text{color:#fff;font-size:15px;font-family:'DM Sans',sans-serif;font-weight:500;}
 .wardrobe-select-bar{display:none;position:fixed;bottom:70px;left:0;right:0;z-index:80;padding:10px 16px;background:var(--ink);gap:8px;align-items:center;}
 .wardrobe-select-bar.open{display:flex;}
 .wsbar-btn{flex:1;padding:10px;border-radius:var(--rsm);border:none;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;}
@@ -584,6 +587,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
 
 <div class="toast" id="toast"></div>
 <div class="saving" id="saving">Saving...</div>
+<div class="saving-overlay" id="saving-overlay">
+  <div class="spinner"></div>
+  <div class="saving-overlay-text">Saving...</div>
+</div>
 
 <script>
 const API='https://script.google.com/macros/s/AKfycbx3fKHJ_EP0AkUb5fUC41iGn1jq2S74IITVpLwLz7_WmDfAfEqIEPOjIS7yTmBborE6/exec';
@@ -705,6 +712,12 @@ function showSaving(){
   el.classList.add('show');
   clearTimeout(savingTimer);
   savingTimer=setTimeout(()=>el.classList.remove('show'),1800);
+}
+function showSavingOverlay(){
+  document.getElementById('saving-overlay').classList.add('show');
+}
+function hideSavingOverlay(){
+  document.getElementById('saving-overlay').classList.remove('show');
 }
 
 // ===== WEATHER =====
@@ -1104,8 +1117,9 @@ async function bulkDeleteOutfits(){
   document.getElementById('outfits-select-btn').classList.remove('active');
   document.getElementById('outfits-bulk-controls').style.display='none';
   renderOutfits();
-  showSaving();
+  showSavingOverlay();
   await Promise.all(ids.map(id=>apiCall({action:'deleteOutfit',id})));
+  hideSavingOverlay();
   showToast(`${ids.length} outfit${ids.length>1?'s':''} deleted`);
 }
 
@@ -1291,12 +1305,13 @@ async function confirmWornFromDetail(){
   closeDatePickScreen();
   closeOutfitDetail();
   renderCalendar();
-  showSaving();
+  showSavingOverlay();
   await Promise.all([
     apiCall({action:'updateOutfit',data:{...o,accByCat:JSON.stringify(o.accByCat)}}),
     apiCall({action:'saveLog',data:log}),
     ...allWorn.map(pid=>{const it=getItem(pid);return it?apiCall({action:'updateItem',data:it}):Promise.resolve();})
   ]);
+  hideSavingOverlay();
   showToast('Outfit logged!');
 }
 
@@ -1409,8 +1424,9 @@ async function saveEditAcc(){
     accSummary.insertBefore(hint,accSummary.firstChild);
   }
   closeEditAcc();
-  showSaving();
+  showSavingOverlay();
   await apiCall({action:'updateOutfit',data:{...o,accByCat:JSON.stringify(o.accByCat)}});
+  hideSavingOverlay();
   showToast('Accessories saved');
 }
 
@@ -1439,11 +1455,12 @@ async function saveEditAccForLog(){
     closeEditAcc();
     editingLogId=null;
     renderCalendar();
-    showSaving();
+    showSavingOverlay();
     await Promise.all([
       apiCall({action:'updateOutfit',data:{...o,accByCat:JSON.stringify(o.accByCat)}}),
       apiCall({action:'updateLog',data:log})
     ]);
+    hideSavingOverlay();
     showToast('Accessories updated');
   } else {
     closeEditAcc();
@@ -1458,8 +1475,9 @@ async function deleteOutfitFromDetail(){
   outfits=outfits.filter(o=>o.id!==id);
   closeOutfitDetail();
   renderOutfits();
-  showSaving();
+  showSavingOverlay();
   await apiCall({action:'deleteOutfit',id});
+  hideSavingOverlay();
   showToast('Outfit deleted');
 }
 
@@ -1544,12 +1562,13 @@ async function confirmWorn(){
   wornLogs.push(log);
   closeWearing();
   renderCalendar();
-  showSaving();
+  showSavingOverlay();
   await Promise.all([
     apiCall({action:'updateOutfit',data:{...o,accByCat:JSON.stringify(o.accByCat)}}),
     apiCall({action:'saveLog',data:log}),
     ...allWorn.map(pid=>{const it=getItem(pid);return it?apiCall({action:'updateItem',data:it}):Promise.resolve();})
   ]);
+  hideSavingOverlay();
   showToast('Outfit logged!');
 }
 
@@ -1988,8 +2007,9 @@ async function deletePairedOutfit(outfitId){
   const totalPages=Math.ceil(pairedOutfitsForModal.length/PAIRED_PER_PAGE);
   if(pairedPage_current>=totalPages&&pairedPage_current>0)pairedPage_current--;
   renderPairedOutfits();
-  showSaving();
+  showSavingOverlay();
   await apiCall({action:'deleteOutfit',id:outfitId});
+  hideSavingOverlay();
   showToast('Outfit deleted');
 }
 
@@ -2052,15 +2072,17 @@ async function saveItemModal(){
 
   if(editingItemId){
     if(item)Object.assign(item,{cat,img,seasons,conditions,emoji:CATS[cat].emoji,occasion,unavailable});
-    closeItemModal();renderWardrobe();showSaving();
+    closeItemModal();renderWardrobe();showSavingOverlay();
     await apiCall({action:'updateItem',data:item});
+    hideSavingOverlay();
     showToast('Item updated!');
   } else {
     const name=`${CATS[cat].label} ${items.filter(i=>i.cat===cat).length+1}`;
     const newItem={id:'i'+Date.now(),name,cat,emoji:CATS[cat].emoji,img,seasons,conditions,occasion,unavailable,wornCount:0,lastWorn:''};
     items.push(newItem);
-    closeItemModal();renderWardrobe();showSaving();
+    closeItemModal();renderWardrobe();showSavingOverlay();
     await apiCall({action:'saveItem',data:newItem});
+    hideSavingOverlay();
     if(CORE_CATS.includes(cat)){
       openCurateScreen(newItem.id);
     } else if(ACC_CATS.includes(cat)){
@@ -2082,9 +2104,10 @@ async function deleteCurrentItem(){
     const ids=affected.map(o=>o.id);
     items=items.filter(i=>i.id!==editingItemId);
     outfits=outfits.filter(o=>!ids.includes(o.id));
-    closeItemModal();renderWardrobe();showSaving();
+    closeItemModal();renderWardrobe();showSavingOverlay();
     await apiCall({action:'deleteItem',id:editingItemId});
     await Promise.all(ids.map(oid=>apiCall({action:'deleteOutfit',id:oid})));
+    hideSavingOverlay();
     showToast('Item and outfits removed');
   } else {
     items=items.filter(i=>i.id!==editingItemId);
@@ -2092,8 +2115,9 @@ async function deleteCurrentItem(){
       ACC_CATS.forEach(cat=>{if(o.accByCat[cat])o.accByCat[cat]=o.accByCat[cat].filter(a=>a!==editingItemId);});
       o.accessories=Object.values(o.accByCat).flat();
     });
-    closeItemModal();renderWardrobe();showSaving();
+    closeItemModal();renderWardrobe();showSavingOverlay();
     await apiCall({action:'deleteItem',id:editingItemId});
+    hideSavingOverlay();
     showToast('Item removed');
   }
 }
@@ -2261,7 +2285,7 @@ async function curateNext(){
       if(!isDuplicateOutfit(pieces)){
         curateSavePair(pieces);
         const outfit=curateSavedOutfits[curateSavedOutfits.length-1];
-        showSaving();
+        showSavingOverlay();
         await apiCall({action:'saveOutfit',data:{...outfit,accByCat:JSON.stringify(outfit.accByCat)}});
       }
     }
@@ -2272,11 +2296,12 @@ async function curateNext(){
       if(!isDuplicateOutfit(pieces)){
         curateSavePair(pieces);
         const outfit=curateSavedOutfits[curateSavedOutfits.length-1];
-        showSaving();
+        showSavingOverlay();
         await apiCall({action:'saveOutfit',data:{...outfit,accByCat:JSON.stringify(outfit.accByCat)}});
       }
     }
   }
+  hideSavingOverlay();
 
   curateStepIdx++;
   if(curateStepIdx>=curateSteps.length){
@@ -2822,12 +2847,13 @@ async function deleteLog(logId,dateStr,isFuture){
   renderCalendar();
   closeDayDetail();
   openDayDetail(dateStr,isFuture);
-  showSaving();
+  showSavingOverlay();
 
   const savePromises=[apiCall({action:'deleteLog',id:logId})];
   if(outfit)savePromises.push(apiCall({action:'updateOutfit',data:{...outfit,accByCat:JSON.stringify(outfit.accByCat)}}));
   updatedItems.forEach(item=>savePromises.push(apiCall({action:'updateItem',data:item})));
   await Promise.all(savePromises);
+  hideSavingOverlay();
   showToast('Removed from calendar');
 }
 
