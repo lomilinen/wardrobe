@@ -2230,6 +2230,7 @@ function toggleCurateItem(id){
 async function curateNext(){
   const step=curateSteps[curateStepIdx];
   if(!step)return;
+  document.getElementById('curate-next-btn').disabled=true;
   const selected=[...curateSelected];
 
   if(step.nextFn==='topGotBottoms'){
@@ -2269,39 +2270,41 @@ async function curateNext(){
     curateSteps.splice(curateStepIdx+1,0,...newSteps);
 
   } else if(step.nextFn==='saveFinal'){
+    showSavingOverlay();
     for(const id of selected){
       const pieces=[...step.pairPieces,id];
       if(!isDuplicateOutfit(pieces)){
         curateSavePair(pieces);
         const outfit=curateSavedOutfits[curateSavedOutfits.length-1];
-        showSaving();
         await apiCall({action:'saveOutfit',data:{...outfit,accByCat:JSON.stringify(outfit.accByCat)}});
       }
     }
+    hideSavingOverlay();
 
   } else if(step.nextFn==='jumperGotDresses'){
+    showSavingOverlay();
     for(const dId of selected){
       const pieces=[dId,curateItemId];
       if(!isDuplicateOutfit(pieces)){
         curateSavePair(pieces);
         const outfit=curateSavedOutfits[curateSavedOutfits.length-1];
-        showSavingOverlay();
         await apiCall({action:'saveOutfit',data:{...outfit,accByCat:JSON.stringify(outfit.accByCat)}});
       }
     }
+    hideSavingOverlay();
 
   } else if(step.nextFn==='dressFinal'){
+    showSavingOverlay();
     for(const jId of selected){
       const pieces=[curateItemId,jId];
       if(!isDuplicateOutfit(pieces)){
         curateSavePair(pieces);
         const outfit=curateSavedOutfits[curateSavedOutfits.length-1];
-        showSavingOverlay();
         await apiCall({action:'saveOutfit',data:{...outfit,accByCat:JSON.stringify(outfit.accByCat)}});
       }
     }
+    hideSavingOverlay();
   }
-  hideSavingOverlay();
 
   curateStepIdx++;
   if(curateStepIdx>=curateSteps.length){
