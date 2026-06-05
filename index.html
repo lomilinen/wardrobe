@@ -1302,6 +1302,8 @@ async function confirmWornFromDetail(){
   allWorn.forEach(pid=>{const it=getItem(pid);if(it){it.lastWorn=new Date().toISOString();it.wornCount=(it.wornCount||0)+1;}});
   wornLogs.push(log);
   suggestionCache={};
+  suggestionPages={};
+  suggestionPageIndex={};
   closeDatePickScreen();
   closeOutfitDetail();
   renderCalendar();
@@ -2827,6 +2829,8 @@ async function deleteLog(logId,dateStr,isFuture){
   // Remove log first
   wornLogs=wornLogs.filter(l=>l.id!==logId);
   suggestionCache={};
+  suggestionPages={};
+  suggestionPageIndex={};
 
   // Recalculate outfit lastWorn from remaining logs
   const outfit=outfits.find(o=>o.id===log.outfitId);
