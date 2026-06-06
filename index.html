@@ -2642,8 +2642,9 @@ function renderSuggestionPage(wrap,pages,pageIdx,dateStr,isFuture,pool,tempC,con
     const col=document.createElement('div');
     col.style.cssText='background:var(--cream);border-radius:var(--rsm);overflow:hidden;cursor:pointer;border:1px solid var(--border);';
     col.innerHTML=`${buildFlatlayCore(o.id)}
-      <div style="padding:6px;display:flex;justify-content:center;">
+      <div style="padding:6px;display:flex;justify-content:center;gap:5px;">
         <button class="wear-btn" style="font-size:10px;padding:5px 10px;" onclick="closeDayDetail();openWearing('${o.id}','${dateStr}')">Wearing this</button>
+        <button class="wear-btn" style="font-size:10px;padding:5px 10px;background:var(--warm);color:var(--ink);border:1px solid var(--border);" onclick="closeDayDetail();editingLogId=null;currentOutfitDetailId='${o.id}';openEditAccFromDetail()">Edit acc</button>
       </div>`;
     grid.appendChild(col);
   });
