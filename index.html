@@ -229,6 +229,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
 /* PAIRED IN OUTFITS — 4 per row grid */
 .paired-outfits-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:6px;}
 .paired-outfit-card{background:var(--cream);border:1px solid var(--border);border-radius:var(--rsm);overflow:hidden;cursor:pointer;transition:all .15s;position:relative;}
+.paired-outfit-card.icard-unavailable{opacity:.35;}
 .paired-outfit-card:hover{border-color:var(--border-mid);}
 .paired-outfit-card.marked-remove{outline:2px solid var(--rose);opacity:.75;}
 .paired-outfit-open-btn{width:100%;padding:4px 6px;font-size:10px;font-weight:500;background:var(--ink);color:var(--warm);border:none;cursor:pointer;font-family:'DM Sans',sans-serif;}
