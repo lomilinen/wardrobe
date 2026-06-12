@@ -390,7 +390,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
       <div id="outfits-bulk-controls" style="display:none;margin-left:auto;">
         <button class="btn-danger" style="font-size:12px;padding:7px 12px;" onclick="bulkDeleteOutfits()">Delete selected</button>
       </div>
-      <button class="catbtn" id="outfits-loved-btn" onclick="toggleLovedFilter()" style="font-size:15px;">★</button>
+      <button class="catbtn" id="outfits-loved-btn" onclick="toggleLovedFilter()" style="font-size:11px;padding:6px 9px;">★</button>
       <button class="catbtn" id="outfits-select-btn" onclick="toggleOutfitSelectMode()" style="margin-left:auto;">Select</button>
     </div>
     <div id="outfits-list" class="outfits-grid"></div>
@@ -1150,10 +1150,19 @@ function renderOutfits(){
   const tempFilters=[...outfitsWeatherFilters].filter(f=>f!=='rainy');
   const rainFilter=outfitsWeatherFilters.has('rainy');
 
-  // Loved filter: show one card per loved log entry
+  // Loved filter: show one card per loved log entry, respecting type/weather filters
   if(lovedFilterActive){
     const lovedLogs=wornLogs.filter(l=>l.loved===true||l.loved==='true');
-    outfitsFiltered=lovedLogs.map(l=>({...l,_isLovedLog:true}));
+    let lovedOutfitIds=lovedLogs.map(l=>l.outfitId);
+    // Apply type filter to the outfits those logs belong to
+    let lovedOutfits=outfits.filter(o=>lovedOutfitIds.includes(o.id)&&o.id!=='__preview__');
+    if(tempFilters.length)lovedOutfits=lovedOutfits.filter(o=>tempFilters.some(tf=>outfitMatchesTempFilter(o,tf)));
+    if(rainFilter)lovedOutfits=lovedOutfits.filter(o=>outfitMatchesTempFilter(o,'rainy'));
+    if(typeFilter==='occasion')lovedOutfits=lovedOutfits.filter(o=>isOccasionOutfit(o));
+    if(typeFilter==='everyday')lovedOutfits=lovedOutfits.filter(o=>!isOccasionOutfit(o)&&!isUnavailableOutfit(o));
+    if(typeFilter==='unavailable')lovedOutfits=lovedOutfits.filter(o=>isUnavailableOutfit(o));
+    const filteredOutfitIds=new Set(lovedOutfits.map(o=>o.id));
+    outfitsFiltered=lovedLogs.filter(l=>filteredOutfitIds.has(l.outfitId)).map(l=>({...l,_isLovedLog:true}));
     renderOutfitsPage();
     return;
   }
@@ -1229,7 +1238,7 @@ function renderOutfitsPage(){
       return`<div class="outfit-card" onclick="openWearingFromLovedLog('${o.id}')">
         ${flHtml}
         <div class="outfit-card-foot">
-          <div class="iworn">★ ${o.date}</div>
+          <div class="iworn">★ ${o.date?new Date(o.date+'T12:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}):''}</div>
         </div>
       </div>`;
     }
