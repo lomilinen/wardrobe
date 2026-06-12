@@ -113,6 +113,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
 .acc-cat-title{font-size:12px;font-weight:500;color:var(--ink-soft);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em;}
 .acc-options{display:flex;gap:8px;flex-wrap:wrap;}
 .acc-option{display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;}
+.acc-option.greyed{opacity:.3;pointer-events:none;}
 .acc-option-thumb{width:60px;height:60px;border-radius:var(--rsm);background:var(--warm);border:2px solid var(--border);overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:24px;transition:border-color .15s;}
 .acc-option-thumb img{width:100%;height:100%;object-fit:contain;}
 .acc-option.selected .acc-option-thumb{border-color:var(--sage);}
@@ -454,7 +455,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
   <div class="wearing-title">Complete your look</div>
   <div class="date-pick-section" id="wearing-date-section">
     <div class="date-pick-label">Which date?</div>
-    <input class="date-input" type="date" id="wearing-date-input" style="width:auto;">
+    <input class="date-input" type="date" id="wearing-date-input" style="width:auto;max-width:180px;">
   </div>
   <div style="margin-top:1.25rem;" class="sec-label">Core pieces</div>
   <div class="wearing-core" id="wearing-core"></div>
@@ -3112,28 +3113,7 @@ function openTripDetail(tripId){
   const content=document.getElementById('trip-detail-content');
   content.innerHTML='';
 
-  // Packed items grouped by category
-  const catSection=document.createElement('div');
-  catSection.style.marginBottom='1.5rem';
-  const catHtml=Object.keys(CATS).map(cat=>{
-    const catItems=(t.items||[]).map(getItem).filter(Boolean).filter(i=>i.cat===cat);
-    if(!catItems.length)return'';
-    return`<div style="margin-bottom:1rem;">
-      <div class="sec-label">${CATS[cat].label}</div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;">
-        ${catItems.map(i=>`<div class="trip-packed-thumb" style="width:54px;height:54px;">${i.img?`<img src="${i.img}" loading="lazy">`:`<span>${i.emoji||'👕'}</span>`}</div>`).join('')}
-      </div>
-    </div>`;
-  }).join('');
-  catSection.innerHTML=catHtml;
-  content.appendChild(catSection);
-
-  // Divider
-  const div=document.createElement('hr');
-  div.className='divider';
-  content.appendChild(div);
-
-  // Outfits where all core pieces are packed
+  // Outfits first
   const label=document.createElement('div');
   label.className='sec-label';
   label.style.marginBottom='8px';
@@ -3163,6 +3143,32 @@ function openTripDetail(tripId){
       </div>`).join('');
     content.appendChild(grid);
   }
+
+  // Divider then packed items
+  const div=document.createElement('hr');
+  div.className='divider';
+  content.appendChild(div);
+
+  const packedLabel=document.createElement('div');
+  packedLabel.className='sec-label';
+  packedLabel.style.marginBottom='8px';
+  packedLabel.textContent='Packed items';
+  content.appendChild(packedLabel);
+
+  const catSection=document.createElement('div');
+  catSection.style.marginBottom='1.5rem';
+  const catHtml=Object.keys(CATS).map(cat=>{
+    const catItems=(t.items||[]).map(getItem).filter(Boolean).filter(i=>i.cat===cat);
+    if(!catItems.length)return'';
+    return`<div style="margin-bottom:1rem;">
+      <div class="sec-label">${CATS[cat].label}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        ${catItems.map(i=>`<div class="trip-packed-thumb" style="width:54px;height:54px;">${i.img?`<img src="${i.img}" loading="lazy">`:`<span>${i.emoji||'👕'}</span>`}</div>`).join('')}
+      </div>
+    </div>`;
+  }).join('');
+  catSection.innerHTML=catHtml;
+  content.appendChild(catSection);
 
   document.getElementById('trip-detail-screen').classList.add('open');
 }
