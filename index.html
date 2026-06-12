@@ -359,20 +359,20 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
 
   <!-- OUTFITS -->
   <div id="view-outfits" class="view">
-    <div class="outfits-controls" style="flex-wrap:wrap;gap:6px;">
-      <select class="wdropdown" id="outfits-sort-select" onchange="onOutfitsSortChange(this)">
+    <div class="outfits-controls" style="flex-wrap:nowrap;gap:4px;overflow-x:auto;">
+      <select class="wdropdown" id="outfits-sort-select" onchange="onOutfitsSortChange(this)" style="font-size:11px;padding:5px 22px 5px 8px;">
         <option value="least">Least worn</option>
         <option value="most">Most worn</option>
         <option value="newest">Newest</option>
         <option value="oldest">Oldest</option>
       </select>
-      <select class="wdropdown" id="outfits-type-select" onchange="onOutfitsTypeChange(this)">
+      <select class="wdropdown" id="outfits-type-select" onchange="onOutfitsTypeChange(this)" style="font-size:11px;padding:5px 22px 5px 8px;">
         <option value="everyday">Everyday</option>
         <option value="all">All outfits</option>
         <option value="occasion">🎉 Occasion</option>
         <option value="unavailable">🚫 Unavailable</option>
       </select>
-      <button class="catbtn" id="outfits-weather-btn" onclick="toggleOutfitsWeatherPicker()">Weather <span id="outfits-weather-count"></span></button>
+      <button class="catbtn" id="outfits-weather-btn" onclick="toggleOutfitsWeatherPicker()" style="font-size:11px;padding:5px 9px;">Weather <span id="outfits-weather-count"></span></button>
       <div id="outfits-weather-picker" style="display:none;position:fixed;background:var(--warm);border:1px solid var(--border);border-radius:var(--rsm);padding:10px;z-index:150;box-shadow:0 4px 16px rgba(0,0,0,.12);width:220px;">
         <div style="font-size:11px;color:var(--ink-faint);margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em;">Temperature</div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;">
@@ -391,7 +391,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
         <button class="btn-danger" style="font-size:12px;padding:7px 12px;" onclick="bulkDeleteOutfits()">Delete selected</button>
       </div>
       <button class="catbtn" id="outfits-loved-btn" onclick="toggleLovedFilter()" style="font-size:11px;padding:6px 9px;">★</button>
-      <button class="catbtn" id="outfits-select-btn" onclick="toggleOutfitSelectMode()" style="margin-left:auto;">Select</button>
+      <button class="catbtn" id="outfits-select-btn" onclick="toggleOutfitSelectMode()" style="margin-left:auto;font-size:11px;padding:5px 9px;">Select</button>
     </div>
     <div id="outfits-list" class="outfits-grid"></div>
     <div id="outfits-pagination" style="display:none;justify-content:center;align-items:center;gap:12px;margin-top:1rem;">
@@ -1238,7 +1238,7 @@ function renderOutfitsPage(){
       return`<div class="outfit-card" onclick="openWearingFromLovedLog('${o.id}')">
         ${flHtml}
         <div class="outfit-card-foot">
-          <div class="iworn">★ ${o.date?new Date(o.date+'T12:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}):''}</div>
+          <div class="iworn">★ ${o.date?new Date((o.date.includes('T')?o.date.split('T')[0]:o.date)+'T12:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}):''}</div>
         </div>
       </div>`;
     }
