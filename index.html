@@ -390,6 +390,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
       <div id="outfits-bulk-controls" style="display:none;margin-left:auto;">
         <button class="btn-danger" style="font-size:12px;padding:7px 12px;" onclick="bulkDeleteOutfits()">Delete selected</button>
       </div>
+      <button class="catbtn" id="outfits-loved-btn" onclick="toggleLovedFilter()" style="font-size:15px;">★</button>
       <button class="catbtn" id="outfits-select-btn" onclick="toggleOutfitSelectMode()" style="margin-left:auto;">Select</button>
     </div>
     <div id="outfits-list" class="outfits-grid"></div>
@@ -1099,6 +1100,7 @@ let outfitsPage=0;
 let outfitsFiltered=[];
 let outfitSelectMode=false;
 let outfitSelected=new Set();
+let lovedFilterActive=false;
 
 function toggleOutfitSelectMode(){
   outfitSelectMode=!outfitSelectMode;
@@ -1148,6 +1150,14 @@ function renderOutfits(){
   const tempFilters=[...outfitsWeatherFilters].filter(f=>f!=='rainy');
   const rainFilter=outfitsWeatherFilters.has('rainy');
 
+  // Loved filter: show one card per loved log entry
+  if(lovedFilterActive){
+    const lovedLogs=wornLogs.filter(l=>l.loved===true||l.loved==='true');
+    outfitsFiltered=lovedLogs.map(l=>({...l,_isLovedLog:true}));
+    renderOutfitsPage();
+    return;
+  }
+
   outfitsFiltered=outfits.filter(o=>o.id!=='__preview__');
   if(tempFilters.length)outfitsFiltered=outfitsFiltered.filter(o=>tempFilters.some(tf=>outfitMatchesTempFilter(o,tf)));
   if(rainFilter)outfitsFiltered=outfitsFiltered.filter(o=>outfitMatchesTempFilter(o,'rainy'));
@@ -1167,6 +1177,33 @@ function renderOutfits(){
   renderOutfitsPage();
 }
 
+function toggleLovedFilter(){
+  lovedFilterActive=!lovedFilterActive;
+  const btn=document.getElementById('outfits-loved-btn');
+  if(btn)btn.classList.toggle('active',lovedFilterActive);
+  renderOutfits();
+}
+
+function openWearingFromLovedLog(logId){
+  const log=wornLogs.find(l=>l.id===logId);
+  if(!log)return;
+  const o=outfits.find(x=>x.id===log.outfitId);
+  if(!o)return;
+  // Pre-populate accByCat from log accessories for wearing screen
+  const logAccByCat={};
+  (log.accessories||[]).forEach(aid=>{
+    const it=getItem(aid);
+    if(it){if(!logAccByCat[it.cat])logAccByCat[it.cat]=[];logAccByCat[it.cat].push(aid);}
+  });
+  const tempOutfit={...o,accByCat:logAccByCat};
+  const existing=outfits.find(x=>x.id===o.id);
+  const savedAccByCat=existing?{...existing.accByCat}:{}; 
+  if(existing)existing.accByCat=logAccByCat;
+  openWearing(o.id,null);
+  // Restore after openWearing reads accByCat
+  if(existing)existing.accByCat=savedAccByCat;
+}
+
 function renderOutfitsPage(){
   const list=document.getElementById('outfits-list');
   const pag=document.getElementById('outfits-pagination');
@@ -1179,6 +1216,24 @@ function renderOutfitsPage(){
   const page=outfitsFiltered.slice(outfitsPage*OUTFITS_PER_PAGE,(outfitsPage+1)*OUTFITS_PER_PAGE);
 
   list.innerHTML=page.map(o=>{
+    // Loved log card
+    if(o._isLovedLog){
+      const logOutfit=outfits.find(x=>x.id===o.outfitId);
+      if(!logOutfit)return'';
+      const wornAccByCat={};
+      (o.accessories||[]).forEach(aid=>{const it=getItem(aid);if(it){if(!wornAccByCat[it.cat])wornAccByCat[it.cat]=[];wornAccByCat[it.cat].push(aid);}});
+      const tempId='__loved_'+o.id;
+      outfits.push({...logOutfit,id:tempId,accByCat:wornAccByCat,pieces:o.pieces||logOutfit.pieces});
+      const flHtml=buildFlatlay(tempId);
+      outfits=outfits.filter(x=>x.id!==tempId);
+      return`<div class="outfit-card" onclick="openWearingFromLovedLog('${o.id}')">
+        ${flHtml}
+        <div class="outfit-card-foot">
+          <div class="iworn">★ ${o.date}</div>
+        </div>
+      </div>`;
+    }
+    // Normal outfit card
     const isOcc=isOccasionOutfit(o);
     const outfitWornCount=wornLogs.filter(l=>l.outfitId===o.id).length;
     const isSelected=outfitSelected.has(o.id);
@@ -1188,7 +1243,6 @@ function renderOutfitsPage(){
       <div class="outfit-card-foot">
         <div class="outfit-card-badges">
           ${isOcc?'<span class="sbadge badge-old">🎉 Occasion</span>':''}
-          
         </div>
         <div class="iworn">${outfitWornCount}× · ${daysSinceLabel(o.lastWorn)}</div>
       </div>
@@ -1921,7 +1975,12 @@ function openEditModal(id){
     pairedOutfitsForModal=[];
   }
   // Sort by outfit number so duplicates are easy to spot
-  pairedOutfitsForModal.sort((a,b)=>(a.num||0)-(b.num||0));
+  pairedOutfitsForModal.sort((a,b)=>{
+    const aUnavail=isUnavailableOutfit(a)?1:0;
+    const bUnavail=isUnavailableOutfit(b)?1:0;
+    if(aUnavail!==bUnavail)return aUnavail-bUnavail;
+    return(a.num||0)-(b.num||0);
+  });
 
   if(pairedOutfitsForModal.length){
     pairedSec.style.display='block';
@@ -2786,9 +2845,11 @@ function openDayDetail(dateStr,isFuture){
         flatlayHtml=buildFlatlay(tempId);
         outfits=outfits.filter(x=>x.id!==tempId);
       }
+      const isLoved=log.loved===true||log.loved==='true';
       div.innerHTML=`<div class="logged-outfit-header">
         <span class="logged-outfit-label">Outfit</span>
-        <div style="display:flex;gap:4px;">
+        <div style="display:flex;gap:4px;align-items:center;">
+          <button class="logged-delete-btn" style="color:${isLoved?'var(--ink)':'var(--ink-faint)'};font-size:14px;" onclick="toggleLogLoved('${log.id}','${dateStr}',${isFuture})">★</button>
           <button class="logged-delete-btn" style="color:var(--ink-muted);" onclick="editLogAccFromSheet('${log.id}','${log.outfitId}')">Edit</button>
           <button class="logged-delete-btn" onclick="deleteLog('${log.id}','${dateStr}',${isFuture})">✕</button>
         </div>
@@ -2830,6 +2891,15 @@ function openDayDetail(dateStr,isFuture){
   }
 
   document.getElementById('day-detail').classList.add('open');
+}
+
+async function toggleLogLoved(logId,dateStr,isFuture){
+  const log=wornLogs.find(l=>l.id===logId);
+  if(!log)return;
+  log.loved=!(log.loved===true||log.loved==='true');
+  closeDayDetail();
+  openDayDetail(dateStr,isFuture);
+  await apiCall({action:'updateLog',data:log});
 }
 
 async function deleteLog(logId,dateStr,isFuture){
