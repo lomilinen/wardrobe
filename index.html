@@ -454,7 +454,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
   <div class="wearing-title">Complete your look</div>
   <div class="date-pick-section" id="wearing-date-section">
     <div class="date-pick-label">Which date?</div>
-    <input class="date-input" type="date" id="wearing-date-input">
+    <input class="date-input" type="date" id="wearing-date-input" style="width:auto;">
   </div>
   <div style="margin-top:1.25rem;" class="sec-label">Core pieces</div>
   <div class="wearing-core" id="wearing-core"></div>
@@ -1634,21 +1634,39 @@ function openWearing(outfitId,dateOverride){
   const sections=document.getElementById('wearing-acc-sections');
   sections.innerHTML='';
   ACC_CATS.forEach(cat=>{
-    const linked=(accByCat[cat]||[]).map(id=>getItem(id)).filter(Boolean)
-      .filter(a=>accWeatherOk(a,weather.tempC,weather.condition));
-    if(!linked.length)return;
-    const sec=document.createElement('div');
-    sec.className='acc-cat-section';
-    sec.innerHTML=`<div class="acc-cat-title">${CATS[cat].label}</div>
-      <div class="acc-options" id="acc-opts-${cat}">
-        ${linked.map(a=>{
-          const notPacked=tripPackedIds&&!tripPackedIds.has(a.id);
-          return`<div class="acc-option${notPacked?' greyed':''}" id="aopt-${a.id}" onclick="selectAcc('${cat}','${a.id}')">
+    let display;
+    if(tripPackedIds){
+      // Trip flow: show all packed accessories in this category, grey out if not linked to outfit
+      const linkedIds=new Set(accByCat[cat]||[]);
+      display=items.filter(a=>a.cat===cat&&tripPackedIds.has(a.id));
+      if(!display.length)return;
+      const sec=document.createElement('div');
+      sec.className='acc-cat-section';
+      sec.innerHTML=`<div class="acc-cat-title">${CATS[cat].label}</div>
+        <div class="acc-options" id="acc-opts-${cat}">
+          ${display.map(a=>{
+            const notLinked=!linkedIds.has(a.id);
+            return`<div class="acc-option${notLinked?' greyed':''}" id="aopt-${a.id}" onclick="selectAcc('${cat}','${a.id}')">
+              <div class="acc-option-thumb">${a.img?`<img src="${a.img}" loading="lazy">`:`<span>${a.emoji||'💍'}</span>`}</div>
+            </div>`;
+          }).join('')}
+        </div>`;
+      sections.appendChild(sec);
+    } else {
+      // Normal flow: show linked accessories filtered by weather
+      const linked=(accByCat[cat]||[]).map(id=>getItem(id)).filter(Boolean)
+        .filter(a=>accWeatherOk(a,weather.tempC,weather.condition));
+      if(!linked.length)return;
+      const sec=document.createElement('div');
+      sec.className='acc-cat-section';
+      sec.innerHTML=`<div class="acc-cat-title">${CATS[cat].label}</div>
+        <div class="acc-options" id="acc-opts-${cat}">
+          ${linked.map(a=>`<div class="acc-option" id="aopt-${a.id}" onclick="selectAcc('${cat}','${a.id}')">
             <div class="acc-option-thumb">${a.img?`<img src="${a.img}" loading="lazy">`:`<span>${a.emoji||'💍'}</span>`}</div>
-          </div>`;
-        }).join('')}
-      </div>`;
-    sections.appendChild(sec);
+          </div>`).join('')}
+        </div>`;
+      sections.appendChild(sec);
+    }
   });
 
   // Pre-select previously chosen accessories when editing a past log
