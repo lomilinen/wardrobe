@@ -1569,10 +1569,17 @@ function editLogAccFromSheet(logId,outfitId){
   const log=wornLogs.find(l=>l.id===logId);
   const o=outfits.find(x=>x.id===outfitId);
   if(!log||!o)return;
+  // Check if outfit has any linked accessories
+  const hasLinkedAcc=ACC_CATS.some(cat=>(o.accByCat[cat]||[]).length>0);
+  if(!hasLinkedAcc){
+    closeDayDetail();
+    showToast('No accessories linked — edit them from the Outfits tab');
+    return;
+  }
+  // Open wearing screen with log's accessories pre-selected
   editingLogId=logId;
-  currentOutfitDetailId=outfitId;
   closeDayDetail();
-  openEditAccFromDetail();
+  openWearing(outfitId,log.date);
 }
 
 async function saveEditAccForLog(){
@@ -1698,11 +1705,30 @@ async function confirmWorn(){
       chosenAccs.push(el.id.replace('aopt-',''));
     });
   });
-  const hasAccOptions=document.querySelectorAll('.acc-option').length>0;
+  const hasAccOptions=document.querySelectorAll('.acc-option:not(.greyed)').length>0;
   if(hasAccOptions&&chosenAccs.length===0){
     if(!confirm('No accessories selected — log this outfit without any?'))return;
   }
   const logDate=document.getElementById('wearing-date-input').value||todayStr();
+
+  // If editing an existing log, update it instead of creating a new one
+  if(editingLogId){
+    const existingLog=wornLogs.find(l=>l.id===editingLogId);
+    if(existingLog){
+      existingLog.accessories=chosenAccs;
+      existingLog.date=logDate;
+      const lid=editingLogId;
+      editingLogId=null;
+      closeWearing();
+      renderCalendar();
+      showSavingOverlay();
+      await apiCall({action:'updateLog',data:existingLog});
+      hideSavingOverlay();
+      showToast('Log updated!');
+      return;
+    }
+  }
+
   const log={
     id:'l'+Date.now(),date:logDate,
     outfitId:o.id,outfitNum:o.num,
@@ -1736,6 +1762,7 @@ function closeWearing(){
   document.getElementById('wearing-screen').classList.remove('open');
   wearingOutfitId=null;
   tripPackedIds=null;
+  editingLogId=null;
 }
 
 // ===== WARDROBE =====
