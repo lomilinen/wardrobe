@@ -198,8 +198,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
 .sheet-handle{width:36px;height:3px;background:var(--border-mid);border-radius:3px;margin:0 auto 1.25rem;}
 .sheet-title{font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:400;margin-bottom:4px;}
 .sheet-weather{font-size:12px;color:var(--ink-faint);margin-bottom:1.25rem;}
-.logged-outfits-row{display:flex;gap:8px;margin-bottom:1rem;overflow-x:auto;-webkit-overflow-scrolling:touch;}
-.logged-outfit{background:var(--cream);border-radius:var(--rsm);padding:.5rem;flex:0 0 130px;min-width:130px;}
+.logged-outfits-row{display:flex;gap:8px;margin-bottom:1rem;}
+.logged-outfit{background:var(--cream);border-radius:var(--rsm);padding:.5rem;flex:1;min-width:0;max-width:140px;}
 .logged-outfit .flatlay-cell{min-height:36px;}
 .logged-outfit-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
 .logged-outfit-label{font-size:11px;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.06em;}
@@ -244,9 +244,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
 .toast.show{transform:translateX(-50%) translateY(0);}
 .saving{position:fixed;top:1rem;right:1rem;font-size:11px;color:var(--ink-faint);background:var(--warm);border:1px solid var(--border);border-radius:var(--rpill);padding:4px 10px;z-index:50;opacity:0;transition:opacity .3s;}
 .saving.show{opacity:1;}
-.saving-overlay{display:none;position:fixed;inset:0;background:rgba(26,23,20,.6);z-index:300;align-items:center;justify-content:center;flex-direction:column;gap:14px;}
+.saving-overlay{display:none;position:fixed;bottom:0;left:0;right:0;height:36px;background:rgba(26,23,20,.85);z-index:300;align-items:center;justify-content:center;gap:10px;}
 .saving-overlay.show{display:flex;}
-.saving-overlay-text{color:#fff;font-size:15px;font-family:'DM Sans',sans-serif;font-weight:500;}
+.saving-overlay-text{color:#fff;font-size:12px;font-family:'DM Sans',sans-serif;font-weight:500;letter-spacing:.02em;}
+.saving-overlay .spinner{width:14px;height:14px;border-width:1.5px;margin:0;}
 .wardrobe-select-bar{display:none;position:fixed;bottom:70px;left:0;right:0;z-index:80;padding:10px 16px;background:var(--ink);gap:8px;align-items:center;}
 .wardrobe-select-bar.open{display:flex;}
 .wsbar-btn{flex:1;padding:10px;border-radius:var(--rsm);border:none;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;}
@@ -779,11 +780,23 @@ function showSaving(){
   clearTimeout(savingTimer);
   savingTimer=setTimeout(()=>el.classList.remove('show'),1800);
 }
+let _saveCount=0;
 function showSavingOverlay(){
-  document.getElementById('saving-overlay').classList.add('show');
+  _saveCount++;
+  const el=document.getElementById('saving-overlay');
+  const txt=el.querySelector('.saving-overlay-text');
+  if(txt)txt.textContent=_saveCount>1?`Saving... (${_saveCount})`:'Saving...';
+  el.classList.add('show');
 }
 function hideSavingOverlay(){
-  document.getElementById('saving-overlay').classList.remove('show');
+  _saveCount=Math.max(0,_saveCount-1);
+  const el=document.getElementById('saving-overlay');
+  if(_saveCount===0){
+    el.classList.remove('show');
+  } else {
+    const txt=el.querySelector('.saving-overlay-text');
+    if(txt)txt.textContent=_saveCount>1?`Saving... (${_saveCount})`:'Saving...';
+  }
 }
 
 // ===== WEATHER =====
@@ -1569,17 +1582,10 @@ function editLogAccFromSheet(logId,outfitId){
   const log=wornLogs.find(l=>l.id===logId);
   const o=outfits.find(x=>x.id===outfitId);
   if(!log||!o)return;
-  // Check if outfit has any linked accessories
-  const hasLinkedAcc=ACC_CATS.some(cat=>(o.accByCat[cat]||[]).length>0);
-  if(!hasLinkedAcc){
-    closeDayDetail();
-    showToast('No accessories linked — edit them from the Outfits tab');
-    return;
-  }
-  // Open wearing screen with log's accessories pre-selected
   editingLogId=logId;
+  currentOutfitDetailId=outfitId;
   closeDayDetail();
-  openWearing(outfitId,log.date);
+  openEditAccFromDetail();
 }
 
 async function saveEditAccForLog(){
@@ -1705,30 +1711,11 @@ async function confirmWorn(){
       chosenAccs.push(el.id.replace('aopt-',''));
     });
   });
-  const hasAccOptions=document.querySelectorAll('.acc-option:not(.greyed)').length>0;
+  const hasAccOptions=document.querySelectorAll('.acc-option').length>0;
   if(hasAccOptions&&chosenAccs.length===0){
     if(!confirm('No accessories selected — log this outfit without any?'))return;
   }
   const logDate=document.getElementById('wearing-date-input').value||todayStr();
-
-  // If editing an existing log, update it instead of creating a new one
-  if(editingLogId){
-    const existingLog=wornLogs.find(l=>l.id===editingLogId);
-    if(existingLog){
-      existingLog.accessories=chosenAccs;
-      existingLog.date=logDate;
-      const lid=editingLogId;
-      editingLogId=null;
-      closeWearing();
-      renderCalendar();
-      showSavingOverlay();
-      await apiCall({action:'updateLog',data:existingLog});
-      hideSavingOverlay();
-      showToast('Log updated!');
-      return;
-    }
-  }
-
   const log={
     id:'l'+Date.now(),date:logDate,
     outfitId:o.id,outfitNum:o.num,
@@ -1762,7 +1749,6 @@ function closeWearing(){
   document.getElementById('wearing-screen').classList.remove('open');
   wearingOutfitId=null;
   tripPackedIds=null;
-  editingLogId=null;
 }
 
 // ===== WARDROBE =====
