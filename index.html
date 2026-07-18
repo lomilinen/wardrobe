@@ -3295,8 +3295,9 @@ async function saveTrip(){
     await apiCall({action:'updateTrip',data:{...t,items:JSON.stringify(itemsList)}});
     hideSavingOverlay();
     showToast('Trip updated!');
-    // Refresh detail view
+    closeTripEdit();
     if(currentTripId)openTripDetail(currentTripId);
+    return;
   }
   closeTripEdit();
   openTripList();
