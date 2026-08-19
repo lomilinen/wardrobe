@@ -3339,9 +3339,10 @@ function openLinkOutfits(itemId){
 }
 
 function toggleLinkAccItem(id){
-  if(linkAccSelected.has(id))linkAccSelected.delete(id);
-  else linkAccSelected.add(id);
-  document.getElementById(`loi-${id}`)?.classList.toggle('selected',linkAccSelected.has(id));
+  const sid=String(id);
+  if(linkAccSelected.has(sid))linkAccSelected.delete(sid);
+  else linkAccSelected.add(sid);
+  document.getElementById(`loi-${sid}`)?.classList.toggle('selected',linkAccSelected.has(sid));
   document.getElementById('link-acc-save-btn').disabled=linkAccSelected.size===0;
 }
 
@@ -3352,11 +3353,13 @@ async function saveLinkOutfits(){
   const selected=[...linkAccSelected];
 
   // Find outfits where every core piece in the outfit is in the selected set
-  const matchingOutfits=outfits.filter(o=>
-    o.id!=='__preview__'&&
-    (o.pieces||[]).length>0&&
-    (o.pieces||[]).every(pid=>selected.includes(pid))
-  );
+  const matchingOutfits=outfits.filter(o=>{
+    if(o.id==='__preview__')return false;
+    let pieces=o.pieces||[];
+    if(typeof pieces==='string'){try{pieces=JSON.parse(pieces);}catch(e){pieces=[];}}
+    if(!pieces.length)return false;
+    return pieces.every(pid=>selected.includes(String(pid)));
+  });
 
   if(!matchingOutfits.length){
     closeLinkOutfits();
