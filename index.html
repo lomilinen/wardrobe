@@ -3351,10 +3351,11 @@ async function saveLinkOutfits(){
   if(!acc)return;
   const selected=[...linkAccSelected];
 
-  // Find outfits where ALL selected pieces are core pieces
+  // Find outfits where every core piece in the outfit is in the selected set
   const matchingOutfits=outfits.filter(o=>
     o.id!=='__preview__'&&
-    selected.every(pid=>(o.pieces||[]).includes(pid))
+    (o.pieces||[]).length>0&&
+    (o.pieces||[]).every(pid=>selected.includes(pid))
   );
 
   if(!matchingOutfits.length){
