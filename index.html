@@ -244,10 +244,9 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
 .toast.show{transform:translateX(-50%) translateY(0);}
 .saving{position:fixed;top:1rem;right:1rem;font-size:11px;color:var(--ink-faint);background:var(--warm);border:1px solid var(--border);border-radius:var(--rpill);padding:4px 10px;z-index:50;opacity:0;transition:opacity .3s;}
 .saving.show{opacity:1;}
-.saving-overlay{display:none;position:fixed;bottom:0;left:0;right:0;height:36px;background:rgba(26,23,20,.85);z-index:300;align-items:center;justify-content:center;gap:10px;}
+.saving-overlay{display:none;position:fixed;inset:0;background:rgba(26,23,20,.6);z-index:300;align-items:center;justify-content:center;flex-direction:column;gap:14px;}
 .saving-overlay.show{display:flex;}
-.saving-overlay-text{color:#fff;font-size:12px;font-family:'DM Sans',sans-serif;font-weight:500;letter-spacing:.02em;}
-.saving-overlay .spinner{width:14px;height:14px;border-width:1.5px;margin:0;}
+.saving-overlay-text{color:#fff;font-size:15px;font-family:'DM Sans',sans-serif;font-weight:500;}
 .wardrobe-select-bar{display:none;position:fixed;bottom:70px;left:0;right:0;z-index:80;padding:10px 16px;background:var(--ink);gap:8px;align-items:center;}
 .wardrobe-select-bar.open{display:flex;}
 .wsbar-btn{flex:1;padding:10px;border-radius:var(--rsm);border:none;font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;}
@@ -652,6 +651,22 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
   </div>
 </div>
 
+<!-- LINK OUTFITS SCREEN -->
+<div class="curate-screen" id="link-outfits-screen">
+  <div class="curate-inner">
+    <button class="curate-back" onclick="closeLinkOutfits()">&#8592; Skip &amp; finish</button>
+    <div class="curate-hero" id="link-acc-hero"></div>
+    <div class="curate-title">Which pieces go with this?</div>
+    <div class="curate-subtitle" id="link-acc-subtitle">Select all core pieces that work with this accessory. It will be linked to any outfit containing all selected pieces.</div>
+    <div class="curate-dots" id="link-acc-dots"></div>
+    <div class="curate-grid" id="link-acc-grid"></div>
+    <div class="curate-actions">
+      <button class="curate-skip-btn" onclick="closeLinkOutfits()">Skip</button>
+      <button class="curate-next-btn" id="link-acc-save-btn" onclick="saveLinkOutfits()">Save</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 <div class="saving" id="saving">Saving...</div>
 <div class="saving-overlay" id="saving-overlay">
@@ -780,23 +795,11 @@ function showSaving(){
   clearTimeout(savingTimer);
   savingTimer=setTimeout(()=>el.classList.remove('show'),1800);
 }
-let _saveCount=0;
 function showSavingOverlay(){
-  _saveCount++;
-  const el=document.getElementById('saving-overlay');
-  const txt=el.querySelector('.saving-overlay-text');
-  if(txt)txt.textContent=_saveCount>1?`Saving... (${_saveCount})`:'Saving...';
-  el.classList.add('show');
+  document.getElementById('saving-overlay').classList.add('show');
 }
 function hideSavingOverlay(){
-  _saveCount=Math.max(0,_saveCount-1);
-  const el=document.getElementById('saving-overlay');
-  if(_saveCount===0){
-    el.classList.remove('show');
-  } else {
-    const txt=el.querySelector('.saving-overlay-text');
-    if(txt)txt.textContent=_saveCount>1?`Saving... (${_saveCount})`:'Saving...';
-  }
+  document.getElementById('saving-overlay').classList.remove('show');
 }
 
 // ===== WEATHER =====
@@ -3295,9 +3298,8 @@ async function saveTrip(){
     await apiCall({action:'updateTrip',data:{...t,items:JSON.stringify(itemsList)}});
     hideSavingOverlay();
     showToast('Trip updated!');
-    closeTripEdit();
+    // Refresh detail view
     if(currentTripId)openTripDetail(currentTripId);
-    return;
   }
   closeTripEdit();
   openTripList();
@@ -3309,6 +3311,81 @@ function closeTripEdit(){
 
 // Track packed items for trip wearing flow
 let tripPackedIds=null;
+
+// ===== LINK OUTFITS (accessory) =====
+let linkAccItemId=null;
+let linkAccSelected=new Set();
+
+function openLinkOutfits(itemId){
+  linkAccItemId=itemId;
+  linkAccSelected=new Set();
+  const acc=getItem(itemId);
+  if(!acc)return;
+
+  // Hero
+  const heroEl=document.getElementById('link-acc-hero');
+  heroEl.innerHTML=acc.img?`<img src="${acc.img}" loading="lazy">`:`<span style="font-size:36px;">${acc.emoji||'💍'}</span>`;
+
+  // Grid of all core pieces
+  const corePieces=items.filter(i=>CORE_CATS.includes(i.cat));
+  const grid=document.getElementById('link-acc-grid');
+  grid.innerHTML=corePieces.map(it=>`
+    <div class="curate-item" id="loi-${it.id}" onclick="toggleLinkAccItem('${it.id}')">
+      ${it.img?`<img src="${it.img}" loading="lazy">`:`<span style="font-size:24px;">${it.emoji||'👕'}</span>`}
+    </div>`).join('');
+
+  document.getElementById('link-acc-save-btn').disabled=true;
+  document.getElementById('link-outfits-screen').classList.add('open');
+}
+
+function toggleLinkAccItem(id){
+  if(linkAccSelected.has(id))linkAccSelected.delete(id);
+  else linkAccSelected.add(id);
+  document.getElementById(`loi-${id}`)?.classList.toggle('selected',linkAccSelected.has(id));
+  document.getElementById('link-acc-save-btn').disabled=linkAccSelected.size===0;
+}
+
+async function saveLinkOutfits(){
+  if(!linkAccItemId||!linkAccSelected.size)return;
+  const acc=getItem(linkAccItemId);
+  if(!acc)return;
+  const selected=[...linkAccSelected];
+
+  // Find outfits where ALL selected pieces are core pieces
+  const matchingOutfits=outfits.filter(o=>
+    o.id!=='__preview__'&&
+    selected.every(pid=>(o.pieces||[]).includes(pid))
+  );
+
+  if(!matchingOutfits.length){
+    closeLinkOutfits();
+    showToast('No matching outfits found');
+    return;
+  }
+
+  // Link accessory to each matching outfit
+  matchingOutfits.forEach(o=>{
+    if(!o.accByCat[acc.cat])o.accByCat[acc.cat]=[];
+    if(!o.accByCat[acc.cat].includes(acc.id)){
+      o.accByCat[acc.cat].push(acc.id);
+    }
+    o.accessories=Object.values(o.accByCat).flat();
+  });
+
+  closeLinkOutfits();
+  showSavingOverlay();
+  await Promise.all(matchingOutfits.map(o=>
+    apiCall({action:'updateOutfit',data:{...o,accByCat:JSON.stringify(o.accByCat)}})
+  ));
+  hideSavingOverlay();
+  showToast(`Linked to ${matchingOutfits.length} outfit${matchingOutfits.length>1?'s':''}!`);
+}
+
+function closeLinkOutfits(){
+  document.getElementById('link-outfits-screen').classList.remove('open');
+  linkAccItemId=null;
+  linkAccSelected=new Set();
+}
 
 // ===== EVENTS =====
 document.getElementById('day-detail').addEventListener('click',e=>{if(e.target===document.getElementById('day-detail'))closeDayDetail();});
