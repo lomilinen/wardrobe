@@ -27,7 +27,11 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
 .logo{font-family:'Cormorant Garamond',serif;font-size:26px;font-weight:400;}
 .logo em{font-style:italic;color:var(--ink-muted);}
 .wpill{display:flex;flex-direction:column;align-items:flex-end;gap:1px;background:var(--warm);border:1px solid var(--border);border-radius:var(--rpill);padding:5px 13px;font-size:12px;color:var(--ink-soft);}
-.wdot{width:6px;height:6px;border-radius:50%;background:var(--sage);flex-shrink:0;}
+.wdot{width:6px;height:6px;border-radius:50%;background:var(--amber);flex-shrink:0;transition:background .4s;}
+.wdot.status-loading{background:var(--amber);animation:pulse-dot 1.2s ease-in-out infinite;}
+.wdot.status-fresh{background:var(--sage);animation:none;}
+.wdot.status-error{background:var(--rose);animation:none;}
+@keyframes pulse-dot{0%,100%{opacity:1;}50%{opacity:.35;}}
 
 /* TABS */
 .tabs{display:flex;gap:3px;background:var(--warm);border:1px solid var(--border);border-radius:var(--r);padding:3px;margin-bottom:0.6rem;}
@@ -303,8 +307,8 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
 <body>
 <div class="app">
   <div class="header">
-    <div class="logo">your <em>wardrobe</em></div>
-    <div class="wpill" style="flex-direction:column;align-items:flex-end;gap:1px;"><span style="display:flex;align-items:center;gap:5px;"><span class="wdot"></span><span id="wpill-line1">Seattle · Loading...</span></span><span id="wpill-line2" style="font-size:11px;color:var(--ink-faint);padding-left:14px;"></span></div>
+    <div class="logo" style="display:flex;align-items:center;gap:7px;"><span class="wdot status-loading" id="data-dot"></span>your <em>wardrobe</em></div>
+    <div class="wpill" style="flex-direction:column;align-items:flex-end;gap:1px;"><span id="wpill-line1">Seattle · Loading...</span><span id="wpill-line2" style="font-size:11px;color:var(--ink-faint);"></span></div>
   </div>
   <div class="tabs">
     <button class="tab active" onclick="switchTab('calendar',this)">Calendar</button>
@@ -887,34 +891,86 @@ function previewImg(val){
 }
 
 // ===== INIT =====
+// ===== DATA CACHE =====
+const CACHE_KEYS={items:'wc_items',outfits:'wc_outfits',logs:'wc_logs',ts:'wc_ts'};
+
+function setDotStatus(status){
+  const dot=document.getElementById('data-dot');
+  if(!dot)return;
+  dot.className=`wdot status-${status}`;
+}
+
+function saveCache(itemsData,outfitsData,logsData){
+  try{
+    localStorage.setItem(CACHE_KEYS.items,JSON.stringify(itemsData));
+    localStorage.setItem(CACHE_KEYS.outfits,JSON.stringify(outfitsData));
+    localStorage.setItem(CACHE_KEYS.logs,JSON.stringify(logsData));
+    localStorage.setItem(CACHE_KEYS.ts,Date.now().toString());
+  }catch(e){console.warn('Cache save failed',e);}
+}
+
+function loadCache(){
+  try{
+    const ts=parseInt(localStorage.getItem(CACHE_KEYS.ts)||'0');
+    const itemsData=JSON.parse(localStorage.getItem(CACHE_KEYS.items)||'null');
+    const outfitsData=JSON.parse(localStorage.getItem(CACHE_KEYS.outfits)||'null');
+    const logsData=JSON.parse(localStorage.getItem(CACHE_KEYS.logs)||'null');
+    if(!itemsData||!outfitsData||!logsData)return null;
+    return{itemsData,outfitsData,logsData,ts};
+  }catch(e){return null;}
+}
+
 async function init(){
   const today=new Date();
   calYear=today.getFullYear();calMonth=today.getMonth();
-  renderCalendar(); // render empty structure immediately
-
-  // Fire all fetches simultaneously — don't let weather block data
-  const weatherPromise=loadWeather();
-  const [ir,lr]=await Promise.all([
-    apiCall({action:'getItems'}),
-    apiCall({action:'getLogs'})
-  ]);
-  items=Array.isArray(ir)?ir.map(normalizeItem):[];
-  wornLogs=Array.isArray(lr)?lr:[];
   renderCalendar();
-  renderWardrobe();
+  loadWeather().catch(()=>{});
 
-  // Load outfits and trips in background — re-render when ready
-  apiCall({action:'getOutfits'}).then(or=>{
-    outfits=Array.isArray(or)?or.map(normalizeOutfit):[];
+  // Load from cache immediately so app is usable
+  const cache=loadCache();
+  if(cache){
+    const ageMs=Date.now()-cache.ts;
+    items=Array.isArray(cache.itemsData)?cache.itemsData.map(normalizeItem):[];
+    wornLogs=Array.isArray(cache.logsData)?cache.logsData:[];
+    outfits=Array.isArray(cache.outfitsData)?cache.outfitsData.map(normalizeOutfit):[];
     renderCalendar();
     renderWardrobe();
-  });
-  apiCall({action:'getTrips'}).then(tr=>{
-    trips=Array.isArray(tr)?tr.map(t=>({...t,items:parseArr(t.items)})):[];
-  });
+    setDotStatus('loading'); // amber pulsing — cache shown, fetch in progress
+  }
 
-  // Weather resolves whenever it's ready — no need to await
-  weatherPromise.catch(()=>{});
+  // Fetch fresh data in parallel
+  try{
+    const [ir,lr,or,tr]=await Promise.all([
+      apiCall({action:'getItems'}),
+      apiCall({action:'getLogs'}),
+      apiCall({action:'getOutfits'}),
+      apiCall({action:'getTrips'})
+    ]);
+    const freshItems=Array.isArray(ir)?ir.map(normalizeItem):null;
+    const freshLogs=Array.isArray(lr)?lr:null;
+    const freshOutfits=Array.isArray(or)?or.map(normalizeOutfit):null;
+    const freshTrips=Array.isArray(tr)?tr.map(t=>({...t,items:parseArr(t.items)})):null;
+
+    if(freshItems&&freshLogs&&freshOutfits){
+      items=freshItems;
+      wornLogs=freshLogs;
+      outfits=freshOutfits;
+      if(freshTrips)trips=freshTrips;
+      saveCache(ir,or,lr);
+      renderCalendar();
+      renderWardrobe();
+      setDotStatus('fresh'); // green — fresh data loaded
+    } else {
+      setDotStatus(cache?'error':'error');
+    }
+  } catch(e){
+    console.warn('Fetch failed, using cache',e);
+    setDotStatus('error'); // red — fetch failed, showing cache
+    if(!cache){
+      // No cache and no network
+      document.getElementById('items-grid').innerHTML='<div class="empty-state">Could not load data. Please check your connection.</div>';
+    }
+  }
 }
 
 function normalizeItem(i){
