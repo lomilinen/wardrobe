@@ -1060,8 +1060,18 @@ function score(o){
   const ps=(o.pieces||[]).map(getItem).filter(Boolean);
   const avg=ps.length?ps.reduce((s,p)=>s+daysSince(p.lastWorn),0)/ps.length:0;
   let itemScore=avg*2;
-  const recentPieces=ps.filter(p=>daysSince(p.lastWorn)<7);
-  if(recentPieces.length>0)itemScore-=recentPieces.length*50;
+  
+  // Find freshest piece and apply tiered penalty
+  const recentPieces=ps.filter(p=>daysSince(p.lastWorn)<6);
+  if(recentPieces.length>0){
+    const freshestDaysAgo=Math.min(...recentPieces.map(p=>daysSince(p.lastWorn)));
+    let penalty=0;
+    if(freshestDaysAgo===0)penalty=-200;
+    else if(freshestDaysAgo<=3)penalty=-120;
+    else if(freshestDaysAgo<=5)penalty=-75;
+    itemScore+=penalty;
+  }
+  
   return daysSince(o.lastWorn)*0.5+itemScore;
 }
 function weatherOk(o,tempC,condition){
@@ -2956,8 +2966,9 @@ function renderCalendar(){
       thumbsHtml=`<div style="font-size:14px;margin-top:2px;">${fcast.icon}</div>`;
     }
     const cls=['cal-day',isToday?'today':''].filter(Boolean).join(' ');
-    grid.innerHTML+=`<div class="${cls}" onclick="openDayDetail('${dateStr}',${isFuture})">
-      <div class="cal-day-num">${d}</div>${thumbsHtml}</div>`;
+    const countHtml=logs.length>1?`<div style="position:absolute;top:2px;right:4px;font-size:9px;color:var(--ink-faint);font-weight:500;">${logs.length}</div>`:'';
+    grid.innerHTML+=`<div class="${cls}" style="position:relative;" onclick="openDayDetail('${dateStr}',${isFuture})">
+      <div class="cal-day-num">${d}</div>${countHtml}${thumbsHtml}</div>`;
   }
   const totalCells=startDow+daysInMonth;
   const remaining=(7-totalCells%7)%7;
@@ -3254,14 +3265,19 @@ async function deleteLog(logId,dateStr,isFuture){
   renderCalendar();
   closeDayDetail();
   openDayDetail(dateStr,isFuture);
-  showSavingOverlay();
-
-  const savePromises=[apiCall({action:'deleteLog',id:logId})];
-  if(outfit)savePromises.push(apiCall({action:'updateOutfit',data:{...outfit,accByCat:JSON.stringify(outfit.accByCat)}}));
-  updatedItems.forEach(item=>savePromises.push(apiCall({action:'updateItem',data:item})));
-  await Promise.all(savePromises);
-  hideSavingOverlay();
-  showToast('Removed from calendar');
+  try{
+    showSavingOverlay();
+    const savePromises=[apiCall({action:'deleteLog',id:logId})];
+    if(outfit)savePromises.push(apiCall({action:'updateOutfit',data:{...outfit,accByCat:JSON.stringify(outfit.accByCat)}}));
+    updatedItems.forEach(item=>savePromises.push(apiCall({action:'updateItem',data:item})));
+    const res=await Promise.all(savePromises);
+    if(res.some(r=>r&&r.error))throw new Error('Failed to delete log');
+    showToast('Removed from calendar');
+  }catch(err){
+    showToast(`Error removing: ${err.message}. Refresh the app to check.`);
+  }finally{
+    hideSavingOverlay();
+  }
 }
 
 function closeDayDetail(){document.getElementById('day-detail').classList.remove('open');}
