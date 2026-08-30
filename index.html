@@ -1059,7 +1059,10 @@ function isOccasionOutfit(o){
 function score(o){
   const ps=(o.pieces||[]).map(getItem).filter(Boolean);
   const avg=ps.length?ps.reduce((s,p)=>s+daysSince(p.lastWorn),0)/ps.length:0;
-  return daysSince(o.lastWorn)+avg*2;
+  let itemScore=avg*2;
+  const recentPieces=ps.filter(p=>daysSince(p.lastWorn)<7);
+  if(recentPieces.length>0)itemScore-=recentPieces.length*50;
+  return daysSince(o.lastWorn)*0.5+itemScore;
 }
 function weatherOk(o,tempC,condition){
   const corePieces=(o.pieces||[]).map(getItem).filter(Boolean);
