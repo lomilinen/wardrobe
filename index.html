@@ -3237,7 +3237,6 @@ function openDayDetail(dateStr,isFuture){
   const pool=outfits.filter(o=>!isOccasionOutfit(o)&&!isUnavailableOutfit(o)&&weatherOk(o,tempC,cond));
   
   // Determine if we're in work mode based on the date
-  const date=new Date(dateStr+'T12:00:00');
   const dayOfWeek=date.getDay();
   const isWeekday=(dayOfWeek>=1&&dayOfWeek<=5);
   const workModePool=isWeekday?pool.filter(o=>isWorkOutfit(o)):pool;
