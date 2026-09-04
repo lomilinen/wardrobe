@@ -413,6 +413,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
       <select class="wdropdown" id="outfits-type-select" onchange="onOutfitsTypeChange(this)" style="font-size:11px;padding:5px 22px 5px 8px;">
         <option value="everyday">Everyday</option>
         <option value="all">All outfits</option>
+        <option value="work">💼 Work</option>
         <option value="occasion">🎉 Occasion</option>
         <option value="unavailable">🚫 Unavailable</option>
       </select>
@@ -540,6 +541,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
       <label class="flabel">Type</label>
       <div class="tag-row">
         <button class="wtag" id="occasion-tog" onclick="this.classList.toggle('active')">🎉 Occasion item</button>
+        <button class="wtag" id="work-tog" onclick="this.classList.toggle('active')">💼 Work item</button>
       </div>
       <div class="fhint">Occasion items won't appear in daily suggestions.</div>
     </div>
@@ -760,9 +762,15 @@ const OUTFITS_SORTS=['least','most','newest','oldest'];
 const OUTFITS_SORT_LABELS=['Least worn','Most worn','Newest','Oldest'];
 let outfitsSortIdx=0;
 
-const OUTFITS_TYPES=['','everyday','occasion','unavailable'];
+const OUTFITS_TYPES=['everyday','all','work','occasion','unavailable'];
 const OUTFITS_TYPE_LABELS=['All types','Everyday','🎉 Occasion','🚫 Unavailable'];
-let outfitsTypeIdx=1; // default Everyday
+let outfitsTypeIdx=0; // Will be set to auto-select based on day
+function initOutfitsTypeIdx(){
+  const today=new Date();
+  const dayOfWeek=today.getDay();
+  const isWeekday=(dayOfWeek>=1&&dayOfWeek<=5);
+  outfitsTypeIdx=isWeekday?OUTFITS_TYPES.indexOf('work'):OUTFITS_TYPES.indexOf('everyday');
+}
 
 function onCatDropdownChange(sel){currentCat=sel.value;openWardrobeSection=null;renderWardrobe();}
 function onSortDropdownChange(sel){wardrobeSortIdx=Math.max(0,WARDROBE_SORTS.indexOf(sel.value));renderWardrobe();}
@@ -972,6 +980,7 @@ async function init(){
       outfits=freshOutfits;
       if(freshTrips)trips=freshTrips;
       saveCache(ir,or,lr);
+      initOutfitsTypeIdx();
       renderCalendar();
       renderWardrobe();
       setDotStatus('fresh'); // green — fresh data loaded
@@ -997,7 +1006,8 @@ function normalizeItem(i){
     conditions:parseArr(i.conditions),
     wornCount:Number(i.wornCount)||0,
     occasion:i.occasion==='true'||i.occasion===true,
-    unavailable:i.unavailable==='true'||i.unavailable===true
+    unavailable:i.unavailable==='true'||i.unavailable===true,
+    work:i.work==='true'||i.work===true
   };
 }
 function normalizeOutfit(o){
@@ -1056,7 +1066,11 @@ function todayStr(){return new Date().toLocaleDateString('en-CA');}
 function isOccasionOutfit(o){
   return(o.pieces||[]).some(pid=>{const it=getItem(pid);return it&&it.occasion;});
 }
-function score(o){
+function isWorkOutfit(o){
+  const ps=(o.pieces||[]).map(getItem).filter(Boolean);
+  return ps.length&&ps.every(p=>p.work);
+}
+function score(o,dateStr){
   const ps=(o.pieces||[]).map(getItem).filter(Boolean);
   const avg=ps.length?ps.reduce((s,p)=>s+daysSince(p.lastWorn),0)/ps.length:0;
   let itemScore=avg*2;
@@ -1070,6 +1084,20 @@ function score(o){
     else if(freshestDaysAgo<=3)penalty=-120;
     else if(freshestDaysAgo<=5)penalty=-75;
     itemScore+=penalty;
+  }
+  
+  // Apply work penalties based on date context
+  if(dateStr){
+    const date=new Date(dateStr);
+    const dayOfWeek=date.getDay();
+    const isWeekday=(dayOfWeek>=1&&dayOfWeek<=5);
+    const isWeekend=(dayOfWeek===0||dayOfWeek===6);
+    
+    if(isWeekday&&!isWorkOutfit(o)){
+      itemScore+=-120; // Non-work on weekday: -120
+    } else if(isWeekend&&isWorkOutfit(o)){
+      itemScore+=-75; // Work on weekend: -75
+    }
   }
   
   return daysSince(o.lastWorn)*0.5+itemScore;
@@ -1356,6 +1384,7 @@ function renderOutfits(){
   if(rainFilter)outfitsFiltered=outfitsFiltered.filter(o=>outfitMatchesTempFilter(o,'rainy'));
   if(typeFilter==='occasion')outfitsFiltered=outfitsFiltered.filter(o=>isOccasionOutfit(o));
   if(typeFilter==='everyday')outfitsFiltered=outfitsFiltered.filter(o=>!isOccasionOutfit(o)&&!isUnavailableOutfit(o));
+  if(typeFilter==='work')outfitsFiltered=outfitsFiltered.filter(o=>isWorkOutfit(o));
   if(typeFilter==='unavailable')outfitsFiltered=outfitsFiltered.filter(o=>isUnavailableOutfit(o));
   if(sort==='newest'||sort==='oldest'){
     outfitsFiltered.sort((a,b)=>{
@@ -1435,7 +1464,7 @@ function renderOutfitsPage(){
       ${buildFlatlayCore(o.id)}
       <div class="outfit-card-foot">
         <div class="outfit-card-badges">
-          ${isOcc?'<span class="sbadge badge-old">🎉 Occasion</span>':''}
+          ${isOcc?'<span class="sbadge badge-old">🎉</span>':''}${isWorkOutfit(o)?'<span class="sbadge badge-old">💼</span>':''}
         </div>
         <div class="iworn">${outfitWornCount}× · ${daysSinceLabel(o.lastWorn)}</div>
       </div>
@@ -1459,20 +1488,29 @@ function toggleOutfitSelect(id){
 }
 
 // ===== OUTFIT DETAIL =====
-function openOutfitDetail(outfitId,returnTo){
+let currentOutfitDetailWorkMode=false;
+
+function openOutfitDetail(outfitId,returnTo,workMode){
   currentOutfitDetailId=outfitId;
+  currentOutfitDetailWorkMode=workMode||false;
   outfitDetailReturnTo=returnTo||'outfits';
   const o=outfits.find(x=>x.id===outfitId);
   if(!o)return;
   const isOcc=isOccasionOutfit(o);
-  document.getElementById('outfit-detail-title').textContent=isOcc?`🎉 Occasion outfit #${o.num}`:`Outfit #${o.num}`;
+  document.getElementById('outfit-detail-title').textContent=`${isOcc?'🎉 ':''}${isWorkOutfit(o)?'💼 ':''}Outfit #${o.num}`;
   document.getElementById('outfit-detail-flatlay').innerHTML=buildFlatlayCore(outfitId);
 
   const accSummary=document.getElementById('outfit-detail-acc-summary');
   accSummary.innerHTML='';
   let hasAnyAcc=false;
   ACC_CATS.forEach(cat=>{
-    const linked=(o.accByCat[cat]||[]).map(id=>getItem(id)).filter(Boolean);
+    let linked=(o.accByCat[cat]||[]).map(id=>getItem(id)).filter(Boolean);
+    // Filter accessories based on work mode
+    if(currentOutfitDetailWorkMode&&isWorkOutfit(o)){
+      linked=linked.filter(a=>!a.unavailable&&a.work);
+    } else if(!currentOutfitDetailWorkMode){
+      linked=linked.filter(a=>!a.unavailable);
+    }
     if(!linked.length)return;
     hasAnyAcc=true;
     const div=document.createElement('div');
@@ -1995,12 +2033,12 @@ function itemCard(item){
         ?`<div style="position:absolute;top:4px;right:4px;width:18px;height:18px;border-radius:50%;background:var(--sage);display:flex;align-items:center;justify-content:center;z-index:2;"><svg width='10' height='10' viewBox='0 0 10 10'><polyline points='1.5,5 4,7.5 8.5,2.5' stroke='%23fff' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg></div>`
         :`<div style="position:absolute;top:4px;right:4px;width:18px;height:18px;border-radius:50%;border:2px solid var(--border-mid);background:var(--warm);z-index:2;"></div>`}
       <div class="iimg">${item.img?`<img src="${item.img}" loading="lazy">`:`<span>${item.emoji||CATS[item.cat]?.emoji||'👕'}</span>`}</div>
-      <div class="imeta"><div class="iworn">${item.unavailable?'🚫 ':item.occasion?'🎉 ':''} ${item.wornCount||0}× · ${daysSinceLabel(item.lastWorn)}</div></div>
+      <div class="imeta"><div class="iworn">${item.unavailable?'🚫 ':item.occasion?'🎉 ':''}${item.work?'💼 ':''} ${item.wornCount||0}× · ${daysSinceLabel(item.lastWorn)}</div></div>
     </div>`;
   }
   return`<div class="icard${item.unavailable?' icard-unavailable':''}" onclick="openEditModal('${item.id}')">
     <div class="iimg">${item.img?`<img src="${item.img}" loading="lazy">`:`<span>${item.emoji||CATS[item.cat]?.emoji||'👕'}</span>`}</div>
-    <div class="imeta"><div class="iworn">${item.unavailable?'🚫 ':item.occasion?'🎉 ':''} ${item.wornCount||0}× · ${daysSinceLabel(item.lastWorn)}</div></div>
+    <div class="imeta"><div class="iworn">${item.unavailable?'🚫 ':item.occasion?'🎉 ':''}${item.work?'💼 ':''} ${item.wornCount||0}× · ${daysSinceLabel(item.lastWorn)}</div></div>
   </div>`;
 }
 
@@ -2074,7 +2112,7 @@ function navigateOutfitDetail(dir){
   const idx=pool.findIndex(o=>o.id===currentOutfitDetailId);
   if(idx===-1)return;
   const next=pool[idx+dir];
-  if(next)openOutfitDetail(next.id,outfitDetailReturnTo);
+  if(next)openOutfitDetail(next.id,outfitDetailReturnTo,currentOutfitDetailWorkMode);
 }
 
 function navigateItemModal(dir){
@@ -2196,6 +2234,7 @@ function openAddModal(){
   document.getElementById('unavailable-section').style.display='none';
   document.getElementById('unavailable-tog').classList.remove('active');
   document.getElementById('occasion-tog').classList.remove('active');
+  document.getElementById('work-tog').classList.remove('active');
   document.querySelectorAll('[data-itag]').forEach(b=>b.classList.remove('active'));
   document.getElementById('paired-outfits-section').style.display='none';
   onCatChange('tops');
@@ -2221,12 +2260,15 @@ function openEditModal(id){
 
   const occSec=document.getElementById('occasion-section');
   const occTog=document.getElementById('occasion-tog');
+  const workTog=document.getElementById('work-tog');
   if(OCCASION_CATS.includes(item.cat)){
     occSec.style.display='block';
     occTog.classList.toggle('active',!!item.occasion);
+    workTog.classList.toggle('active',!!item.work);
   } else {
     occSec.style.display='none';
     occTog.classList.remove('active');
+    workTog.classList.remove('active');
   }
 
   // Unavailable toggle — available for all items when editing
@@ -2399,6 +2441,7 @@ async function saveItemModal(){
   });
   if(!seasons.length){showToast('Please select at least one season tag');return;}
   const occasion=OCCASION_CATS.includes(cat)&&document.getElementById('occasion-tog').classList.contains('active');
+  const work=OCCASION_CATS.includes(cat)&&document.getElementById('work-tog').classList.contains('active');
   const unavailable=document.getElementById('unavailable-tog').classList.contains('active');
   const item=items.find(i=>i.id===editingItemId);
   const isCore=item&&CORE_CATS.includes(item.cat);
@@ -2422,7 +2465,7 @@ async function saveItemModal(){
   }
 
   if(editingItemId){
-    if(item)Object.assign(item,{cat,img,seasons,conditions,emoji:CATS[cat].emoji,occasion,unavailable});
+    if(item)Object.assign(item,{cat,img,seasons,conditions,emoji:CATS[cat].emoji,occasion,unavailable,work});
     closeItemModal();renderWardrobe();
     try{
       showSavingOverlay();
@@ -2436,7 +2479,7 @@ async function saveItemModal(){
     }
   } else {
     const name=`${CATS[cat].label} ${items.filter(i=>i.cat===cat).length+1}`;
-    const newItem={id:'i'+Date.now(),name,cat,emoji:CATS[cat].emoji,img,seasons,conditions,occasion,unavailable,wornCount:0,lastWorn:''};
+    const newItem={id:'i'+Date.now(),name,cat,emoji:CATS[cat].emoji,img,seasons,conditions,occasion,unavailable,work,wornCount:0,lastWorn:''};
     items.push(newItem);
     closeItemModal();renderWardrobe();
     try{
@@ -3010,7 +3053,7 @@ function getSuggestionPages(pool,dateStr){
     const pages=[];
     let remaining=pool.slice();
     for(let p=0;p<3;p++){
-      const page=getVariedSuggestions(remaining,3);
+      const page=getVariedSuggestions(remaining,3,dateStr);
       if(!page.length)break;
       pages.push(page);
       page.forEach(o=>used.add(o.id));
@@ -3077,8 +3120,8 @@ function renderSuggestionPage(wrap,pages,pageIdx,dateStr,isFuture,pool,tempC,con
 }
 
 // ===== VARIETY SUGGESTIONS =====
-function getVariedSuggestions(pool,max){
-  const sorted=pool.slice().sort((a,b)=>score(b)-score(a));
+function getVariedSuggestions(pool,max,dateStr){
+  const sorted=pool.slice().sort((a,b)=>score(b,dateStr)-score(a,dateStr));
   const picks=[];
   const usedPieces=new Set();
 
@@ -3192,7 +3235,15 @@ function openDayDetail(dateStr,isFuture){
   const tempC=fcast?fcast.tempC:weather.tempC;
   const cond=fcast?fcast.condition:weather.condition;
   const pool=outfits.filter(o=>!isOccasionOutfit(o)&&!isUnavailableOutfit(o)&&weatherOk(o,tempC,cond));
-  const suggestions=getVariedSuggestions(pool,3);
+  
+  // Determine if we're in work mode based on the date
+  const date=new Date(dateStr+'T12:00:00');
+  const dayOfWeek=date.getDay();
+  const isWeekday=(dayOfWeek>=1&&dayOfWeek<=5);
+  const workModePool=isWeekday?pool.filter(o=>isWorkOutfit(o)):pool;
+  const workMode=isWeekday;
+  
+  const suggestions=getVariedSuggestions(workModePool,3,dateStr);
 
   if(isToday||isFuture){
     if(logs.length){
@@ -3209,9 +3260,9 @@ function openDayDetail(dateStr,isFuture){
     } else {
       const suggWrap=document.createElement('div');
       suggWrap.id='sugg-wrap';
-      const allPages=getSuggestionPages(pool,dateStr);
+      const allPages=getSuggestionPages(workModePool,dateStr);
       const pageIdx=suggestionPageIndex[dateStr]||0;
-      renderSuggestionPage(suggWrap,allPages,pageIdx,dateStr,isFuture,pool,tempC,cond);
+      renderSuggestionPage(suggWrap,allPages,pageIdx,dateStr,isFuture,workModePool,tempC,cond);
       content.appendChild(suggWrap);
     }
   }
@@ -3633,6 +3684,19 @@ function closeLinkOutfits(){
 document.getElementById('day-detail').addEventListener('click',e=>{if(e.target===document.getElementById('day-detail'))closeDayDetail();});
 document.getElementById('item-modal').addEventListener('click',e=>{if(e.target===document.getElementById('item-modal'))closeItemModal();});
 
+// ===== TIME-BASED DARK MODE =====
+function applyTimeDarkMode(){
+  const hour=new Date().getHours();
+  const isDarkTime=hour>=21||hour<6;
+  if(isDarkTime){
+    document.documentElement.style.colorScheme='dark';
+  } else {
+    document.documentElement.style.colorScheme='light';
+  }
+}
+
+// ===== INIT =====
+applyTimeDarkMode();
 init();
 </script>
 </body>
