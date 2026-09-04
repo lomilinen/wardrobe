@@ -83,6 +83,23 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
 .outfit-card-foot{display:flex;align-items:center;justify-content:space-between;padding:5px 7px;gap:4px;flex-wrap:wrap;}
 .outfit-card-badges{display:flex;gap:3px;flex-wrap:wrap;}
 
+/* Force light/dark mode overrides */
+html.force-light-mode{
+  --cream:#F5F1EA;--warm:#FFF9F3;--ink:#1A1714;--ink-soft:#3A3A3A;
+  --ink-muted:#888888;--ink-faint:#AAAAAA;--border:#E8E1D5;--border-mid:#E8E1D5;
+  --sage:#356B45;--sage-light:#F0F5F2;--sage-dark:#4A8F5E;
+  --amber:#C4933C;--amber-light:#FCF5E8;
+  --rose:#9B5050;--rose-light:#F5E8E8;
+}
+
+html.force-dark-mode{
+  --cream:#333333;--warm:#242424;--ink:#E8E8E8;--ink-soft:#D0D0D0;
+  --ink-muted:#A8A8A8;--ink-faint:#808080;--border:#333333;--border-mid:#404040;
+  --sage:#6B8F78;--sage-light:#1E3A26;--sage-dark:#A8D5B8;
+  --amber:#D4963D;--amber-light:#2A2414;
+  --rose:#B85C5C;--rose-light:#3A2424;
+}
+
 /* OUTFITS VIEW */
 .outfits-controls{display:flex;gap:8px;margin-bottom:1.25rem;flex-wrap:wrap;align-items:center;}
 .outfits-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;}
@@ -367,6 +384,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);m
       <select class="wdropdown" id="wardrobe-type-select" onchange="onTypeDropdownChange(this)">
         <option value="">All types</option>
         <option value="everyday">Everyday</option>
+        <option value="work">💼 Work</option>
         <option value="occasion">🎉 Occasion</option>
         <option value="unavailable">🚫 Unavailable</option>
       </select>
@@ -753,7 +771,7 @@ const WARDROBE_SORTS=['','least-worn','most-worn','least-outfits','most-outfits'
 const WARDROBE_SORT_LABELS=['Default','Least worn','Most worn','Fewest outfits','Most outfits'];
 let wardrobeSortIdx=0;
 
-const WARDROBE_TYPES=['','everyday','occasion','unavailable'];
+const WARDROBE_TYPES=['','everyday','work','occasion','unavailable'];
 const WARDROBE_TYPE_LABELS=['All types','Everyday','🎉 Occasion','🚫 Unavailable'];
 let wardrobeTypeIdx=0;
 
@@ -1993,6 +2011,7 @@ function renderWardrobe(){
       if(rainFilter&&RAINY_TAG_CATS.includes(i.cat)&&!(i.conditions||[]).includes('rainy'))return false;
       if(typeFilter==='occasion'&&!i.occasion)return false;
       if(typeFilter==='everyday'&&(i.occasion||i.unavailable))return false;
+      if(typeFilter==='work'&&!i.work)return false;
       if(typeFilter==='unavailable'&&!i.unavailable)return false;
       return true;
     });
@@ -2128,6 +2147,7 @@ function navigateItemModal(dir){
     if(rainFilter&&RAINY_TAG_CATS.includes(i.cat)&&!(i.conditions||[]).includes('rainy'))return false;
     if(typeFilter==='occasion'&&!i.occasion)return false;
     if(typeFilter==='everyday'&&(i.occasion||i.unavailable))return false;
+    if(typeFilter==='work'&&!i.work)return false;
     if(typeFilter==='unavailable'&&!i.unavailable)return false;
     return true;
   });
@@ -3687,10 +3707,15 @@ document.getElementById('item-modal').addEventListener('click',e=>{if(e.target==
 function applyTimeDarkMode(){
   const hour=new Date().getHours();
   const isDarkTime=hour>=21||hour<6;
+  const root=document.documentElement;
   if(isDarkTime){
-    document.documentElement.style.colorScheme='dark';
+    root.style.colorScheme='dark';
+    root.classList.add('force-dark-mode');
+    root.classList.remove('force-light-mode');
   } else {
-    document.documentElement.style.colorScheme='light';
+    root.style.colorScheme='light';
+    root.classList.remove('force-dark-mode');
+    root.classList.add('force-light-mode');
   }
 }
 
