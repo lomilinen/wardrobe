@@ -362,18 +362,6 @@ html.force-dark-mode{
   <!-- WARDROBE -->
   <div id="view-wardrobe" class="view">
     <div class="wcontrols" style="gap:6px;flex-wrap:wrap;">
-      <select class="wdropdown" id="wardrobe-cat-select" onchange="onCatDropdownChange(this)">
-        <option value="all">All categories</option>
-        <option value="tops">Tops</option>
-        <option value="bottoms">Bottoms</option>
-        <option value="jumpers">Jumpers</option>
-        <option value="dresses">Dresses</option>
-        <option value="shoes">Shoes</option>
-        <option value="coats">Coats</option>
-        <option value="bags">Bags</option>
-        <option value="scarves">Scarves / Tights</option>
-        <option value="accessories">Accessories</option>
-      </select>
       <select class="wdropdown" id="wardrobe-sort-select" onchange="onSortDropdownChange(this)">
         <option value="">Default order</option>
         <option value="least-worn">Least worn</option>
@@ -788,6 +776,11 @@ function initOutfitsTypeIdx(){
   const dayOfWeek=today.getDay();
   const isWeekday=(dayOfWeek>=1&&dayOfWeek<=5);
   outfitsTypeIdx=isWeekday?OUTFITS_TYPES.indexOf('work'):OUTFITS_TYPES.indexOf('everyday');
+  // Update dropdown to reflect auto-selection
+  const dropdown=document.getElementById('outfits-type-select');
+  if(dropdown){
+    dropdown.value=OUTFITS_TYPES[outfitsTypeIdx];
+  }
 }
 
 function onCatDropdownChange(sel){currentCat=sel.value;openWardrobeSection=null;renderWardrobe();}
@@ -1092,28 +1085,34 @@ function score(o,dateStr){
   const ps=(o.pieces||[]).map(getItem).filter(Boolean);
   const avg=ps.length?ps.reduce((s,p)=>s+daysSince(p.lastWorn),0)/ps.length:0;
   let itemScore=avg*2;
+  const isWork=isWorkOutfit(o);
   
-  // Find freshest piece and apply tiered penalty
-  const recentPieces=ps.filter(p=>daysSince(p.lastWorn)<6);
-  if(recentPieces.length>0){
-    const freshestDaysAgo=Math.min(...recentPieces.map(p=>daysSince(p.lastWorn)));
-    let penalty=0;
-    if(freshestDaysAgo===0)penalty=-200;
-    else if(freshestDaysAgo<=3)penalty=-120;
-    else if(freshestDaysAgo<=5)penalty=-75;
-    itemScore+=penalty;
-  }
-  
-  // Apply work penalties based on date context
+  // Determine if weekday/weekend for context
+  let isWeekday=false;
   if(dateStr){
     const date=new Date(dateStr);
     const dayOfWeek=date.getDay();
-    const isWeekday=(dayOfWeek>=1&&dayOfWeek<=5);
-    const isWeekend=(dayOfWeek===0||dayOfWeek===6);
-    
-    if(isWeekday&&!isWorkOutfit(o)){
-      itemScore+=-120; // Non-work on weekday: -120
-    } else if(isWeekend&&isWorkOutfit(o)){
+    isWeekday=(dayOfWeek>=1&&dayOfWeek<=5);
+  }
+  
+  // Freshness penalty: only apply to non-work outfits or work outfits on weekends
+  if(!isWeekday||!isWork){
+    const recentPieces=ps.filter(p=>daysSince(p.lastWorn)<6);
+    if(recentPieces.length>0){
+      const freshestDaysAgo=Math.min(...recentPieces.map(p=>daysSince(p.lastWorn)));
+      let penalty=0;
+      if(freshestDaysAgo===0)penalty=-200;
+      else if(freshestDaysAgo<=3)penalty=-120;
+      else if(freshestDaysAgo<=5)penalty=-75;
+      itemScore+=penalty;
+    }
+  }
+  
+  // Apply work mode penalties based on date context
+  if(dateStr){
+    if(isWeekday&&!isWork){
+      itemScore+=-500; // Non-work on weekday: extreme penalty (bottom fallback)
+    } else if(!isWeekday&&isWork){
       itemScore+=-75; // Work on weekend: -75
     }
   }
@@ -1368,6 +1367,9 @@ function outfitsChangePage(dir){
 function renderOutfits(){
   const sort=OUTFITS_SORTS[outfitsSortIdx]||'least';
   const typeFilter=OUTFITS_TYPES[outfitsTypeIdx]||'';
+  // Sync dropdown to current filter
+  const dropdown=document.getElementById('outfits-type-select');
+  if(dropdown)dropdown.value=typeFilter||'everyday';
   outfitsPage=0;
 
   // Update weather button label
@@ -1401,9 +1403,10 @@ function renderOutfits(){
   if(tempFilters.length)outfitsFiltered=outfitsFiltered.filter(o=>tempFilters.some(tf=>outfitMatchesTempFilter(o,tf)));
   if(rainFilter)outfitsFiltered=outfitsFiltered.filter(o=>outfitMatchesTempFilter(o,'rainy'));
   if(typeFilter==='occasion')outfitsFiltered=outfitsFiltered.filter(o=>isOccasionOutfit(o));
-  if(typeFilter==='everyday')outfitsFiltered=outfitsFiltered.filter(o=>!isOccasionOutfit(o)&&!isUnavailableOutfit(o));
-  if(typeFilter==='work')outfitsFiltered=outfitsFiltered.filter(o=>isWorkOutfit(o));
-  if(typeFilter==='unavailable')outfitsFiltered=outfitsFiltered.filter(o=>isUnavailableOutfit(o));
+  else if(typeFilter==='everyday')outfitsFiltered=outfitsFiltered.filter(o=>!isOccasionOutfit(o)&&!isUnavailableOutfit(o));
+  else if(typeFilter==='work')outfitsFiltered=outfitsFiltered.filter(o=>isWorkOutfit(o)&&!isUnavailableOutfit(o));
+  else if(typeFilter==='unavailable')outfitsFiltered=outfitsFiltered.filter(o=>isUnavailableOutfit(o));
+  // typeFilter==='all' shows everything including unavailable
   if(sort==='newest'||sort==='oldest'){
     outfitsFiltered.sort((a,b)=>{
       // IDs are 'o'+Date.now()+random — extract timestamp for reliable ordering
@@ -1482,7 +1485,7 @@ function renderOutfitsPage(){
       ${buildFlatlayCore(o.id)}
       <div class="outfit-card-foot">
         <div class="outfit-card-badges">
-          ${isOcc?'<span class="sbadge badge-old">🎉</span>':''}${isWorkOutfit(o)?'<span class="sbadge badge-old">💼</span>':''}
+          ${isUnavailableOutfit(o)?'<span class="sbadge badge-old">🚫</span>':''}${isOcc?'<span class="sbadge badge-old">🎉</span>':''}${isWorkOutfit(o)?'<span class="sbadge badge-old">💼</span>':''}
         </div>
         <div class="iworn">${outfitWornCount}× · ${daysSinceLabel(o.lastWorn)}</div>
       </div>
@@ -1523,11 +1526,9 @@ function openOutfitDetail(outfitId,returnTo,workMode){
   let hasAnyAcc=false;
   ACC_CATS.forEach(cat=>{
     let linked=(o.accByCat[cat]||[]).map(id=>getItem(id)).filter(Boolean);
-    // Filter accessories based on work mode
+    // Don't filter out unavailable - show all and grey out unavailable ones
     if(currentOutfitDetailWorkMode&&isWorkOutfit(o)){
-      linked=linked.filter(a=>!a.unavailable&&a.work);
-    } else if(!currentOutfitDetailWorkMode){
-      linked=linked.filter(a=>!a.unavailable);
+      linked=linked.filter(a=>a.work||a.unavailable); // Show work items or unavailable ones
     }
     if(!linked.length)return;
     hasAnyAcc=true;
@@ -1537,7 +1538,7 @@ function openOutfitDetail(outfitId,returnTo,workMode){
     div.innerHTML=`<div class="sec-label" style="margin-bottom:8px;">${CATS[cat].label}</div>
       <div class="acc-options">
         ${linked.map(a=>`
-          <div class="acc-option" id="dopt-${a.id}" onclick="toggleDetailAcc('${a.id}')">
+          <div class="acc-option" id="dopt-${a.id}"${a.unavailable?'':' onclick="toggleDetailAcc(''+a.id+'')"'} style="${a.unavailable?'opacity:0.5;cursor:not-allowed;':''}">
             <div class="acc-option-thumb">${a.img?`<img src="${a.img}" loading="lazy">`:`<span>${a.emoji||'💍'}</span>`}</div>
           </div>`).join('')}
       </div>`;
@@ -1977,7 +1978,6 @@ function renderWardrobe(){
   const sortVal=WARDROBE_SORTS[wardrobeSortIdx]||'';
   const typeFilter=WARDROBE_TYPES[wardrobeTypeIdx]||'';
   const grid=document.getElementById('items-grid');
-  const isFiltered=currentCat!=='all';
   let html='';let totalFound=0;
 
   // Update weather button label
@@ -2017,27 +2017,21 @@ function renderWardrobe(){
     });
   }
 
-  if(isFiltered){
-    let catItems=applySort(applyFilters(items.filter(i=>i.cat===currentCat)));
-    totalFound=catItems.length;
-    if(!catItems.length){grid.innerHTML='<div class="empty-state">No items match these filters.</div>';return;}
-    html=`<div class="items-grid">${catItems.map(item=>itemCard(item)).join('')}</div>`;
-  } else {
-    Object.keys(CATS).forEach(cat=>{
-      let catItems=applySort(applyFilters(items.filter(i=>i.cat===cat)));
-      if(!catItems.length)return;
-      totalFound+=catItems.length;
-      const isOpen=openWardrobeSection===cat;
-      html+=`<div style="margin-bottom:1.5rem;">
-        <div class="accordion-header" onclick="toggleWardrobeSection('wsec-${cat}',this)">
-          ${CATS[cat].label}
-          <span class="acc-count-pill">${catItems.length}</span>
-          <span class="acc-arrow">${isOpen?'▾':'▸'}</span>
-        </div>
-        <div id="wsec-${cat}" class="items-grid" style="display:${isOpen?'grid':'none'};">${catItems.map(item=>itemCard(item)).join('')}</div>
-      </div>`;
-    });
-  }
+  // Always show accordion with all categories
+  Object.keys(CATS).forEach(cat=>{
+    let catItems=applySort(applyFilters(items.filter(i=>i.cat===cat)));
+    if(!catItems.length)return;
+    totalFound+=catItems.length;
+    const isOpen=openWardrobeSection===cat;
+    html+=`<div style="margin-bottom:1.5rem;">
+      <div class="accordion-header" onclick="toggleWardrobeSection('wsec-${cat}',this)">
+        ${CATS[cat].label}
+        <span class="acc-count-pill">${catItems.length}</span>
+        <span class="acc-arrow">${isOpen?'▾':'▸'}</span>
+      </div>
+      <div id="wsec-${cat}" class="items-grid" style="display:${isOpen?'grid':'none'};">${catItems.map(item=>itemCard(item)).join('')}</div>
+    </div>`;
+  });
 
   if(!totalFound){grid.innerHTML='<div class="empty-state">No items match these filters.</div>';return;}
   grid.innerHTML=html;
@@ -3049,6 +3043,7 @@ function changeMonth(dir){
 
 // ===== UNAVAILABLE OUTFITS =====
 function isUnavailableOutfit(o){
+  // Only core pieces determine if outfit is unavailable
   return(o.pieces||[]).some(pid=>{const it=getItem(pid);return it&&it.unavailable;});
 }
 
