@@ -1538,7 +1538,7 @@ function openOutfitDetail(outfitId,returnTo,workMode){
     div.innerHTML=`<div class="sec-label" style="margin-bottom:8px;">${CATS[cat].label}</div>
       <div class="acc-options">
         ${linked.map(a=>`
-          <div class="acc-option" id="dopt-${a.id}"${a.unavailable?'':' onclick="toggleDetailAcc(''+a.id+'')"'} style="${a.unavailable?'opacity:0.5;cursor:not-allowed;':''}">
+          <div class="acc-option" id="dopt-${a.id}" onclick="toggleDetailAcc('${a.id}')">
             <div class="acc-option-thumb">${a.img?`<img src="${a.img}" loading="lazy">`:`<span>${a.emoji||'💍'}</span>`}</div>
           </div>`).join('')}
       </div>`;
