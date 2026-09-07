@@ -1480,7 +1480,7 @@ function renderOutfitsPage(){
     const isOcc=isOccasionOutfit(o);
     const outfitWornCount=wornLogs.filter(l=>l.outfitId===o.id).length;
     const isSelected=outfitSelected.has(o.id);
-    return`<div class="outfit-card${isSelected?' outfit-card-selected':''}" onclick="${outfitSelectMode?`toggleOutfitSelect('${o.id}')`:`openOutfitDetail('${o.id}','outfits')`}">
+    return`<div class="outfit-card${isSelected?' outfit-card-selected':''}" onclick="${outfitSelectMode?`toggleOutfitSelect('${o.id}')`:`openOutfitDetail('${o.id}','outfits',${typeFilter==='work'})`}">
       ${outfitSelectMode?`<div style="position:absolute;top:5px;left:5px;width:18px;height:18px;border-radius:50%;background:${isSelected?'var(--sage)':'var(--warm)'};border:2px solid ${isSelected?'var(--sage)':'var(--border-mid)'};z-index:2;"></div>`:''}
       ${buildFlatlayCore(o.id)}
       <div class="outfit-card-foot">
