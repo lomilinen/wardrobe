@@ -1723,7 +1723,14 @@ async function saveEditAcc(){
   accSummary.innerHTML='';
   let hasAnyAcc=false;
   ACC_CATS.forEach(cat=>{
-    const linked=(o.accByCat[cat]||[]).map(id=>getItem(id)).filter(Boolean);
+    let linked=(o.accByCat[cat]||[]).map(id=>getItem(id)).filter(Boolean);
+    // Apply work mode filtering (same as in openOutfitDetail)
+    if(currentOutfitDetailWorkMode&&isWorkOutfit(o)){
+      linked=linked.filter(a=>{
+        if(OCCASION_CATS.includes(cat)&&!a.unavailable)return a.work;
+        return true;
+      });
+    }
     if(!linked.length)return;
     hasAnyAcc=true;
     const div=document.createElement('div');
@@ -1731,7 +1738,7 @@ async function saveEditAcc(){
     div.innerHTML=`<div class="sec-label" style="margin-bottom:8px;">${CATS[cat].label}</div>
       <div class="acc-options">
         ${linked.map(a=>`
-          <div class="acc-option" id="dopt-${a.id}" onclick="toggleDetailAcc('${a.id}')">
+          <div class="acc-option" id="dopt-${a.id}" onclick="${a.unavailable?'':'toggleDetailAcc(\''+a.id+'\')'}" style="${a.unavailable?'opacity:0.5;cursor:not-allowed;':''}">
             <div class="acc-option-thumb">${a.img?`<img src="${a.img}" loading="lazy">`:`<span>${a.emoji||'💍'}</span>`}</div>
           </div>`).join('')}
       </div>`;
