@@ -857,7 +857,7 @@ function hideSavingOverlay(){
 async function loadWeather(){
   try{
     // Fetch hourly apparent_temperature and weathercode (8am-8pm daytime average)
-    const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&hourly=apparent_temperature,weathercode&daily=weathercode,precipitation_probability_max&timezone=America%2FLos_Angeles&forecast_days=10`);
+    const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&hourly=apparent_temperature,weathercode&daily=weathercode,precipitation_probability&timezone=America%2FLos_Angeles&forecast_days=10`);
     const d=await r.json();
     // Helper: get daytime avg feels-like for a given date string
     function dayAvgFeelsLike(dateStr){
@@ -874,7 +874,7 @@ async function loadWeather(){
     const todayAvg=dayAvgFeelsLike(today);
     const avgTemp=todayAvg.temp!==null?todayAvg.temp:10;
     const worstCode=todayAvg.code;
-    weather={tempC:avgTemp,condition:wmoToCondition(worstCode,d.daily.precipitation_probability_max[0]),label:wmoToLabel(worstCode),icon:wmoToIcon(worstCode)};
+    weather={tempC:avgTemp,condition:wmoToCondition(worstCode,d.daily.precipitation_probability[0]),label:wmoToLabel(worstCode),icon:wmoToIcon(worstCode)};
     // All forecast days — today reuses weather object, future days calculate their own
     forecast=d.daily.time.map((date,i)=>{
       if(i===0){
@@ -884,7 +884,7 @@ async function loadWeather(){
       const avg=dayAvgFeelsLike(date);
       const tempC=avg.temp!==null?avg.temp:10;
       const code=avg.code||d.daily.weathercode[i];
-      return{date,tempC,condition:wmoToCondition(code,d.daily.precipitation_probability_max[i]),icon:wmoToIcon(code),label:wmoToLabel(code)};
+      return{date,tempC,condition:wmoToCondition(code,d.daily.precipitation_probability[i]),icon:wmoToIcon(code),label:wmoToLabel(code)};
     });
     document.getElementById('wpill-line1').textContent=`Seattle · ${weather.icon} ${weather.label}`;
     document.getElementById('wpill-line2').textContent=`avg. fl. ${avgTemp}°C / ${toF(avgTemp)}°F · ${tempToBand(avgTemp)}`;
@@ -892,7 +892,7 @@ async function loadWeather(){
     document.getElementById('wpill-line1').textContent='Seattle · weather unavailable';
   }
 }
-function wmoToCondition(c,precipProb){if(c>=64&&(precipProb||0)>=70)return'rainy';return'';}
+function wmoToCondition(c,precipProb){if(c>=64&&(precipProb||0)>=70)return'rainy';return '';}
 function wmoToIcon(c){if(c<=1)return'☀️';if(c<=3)return'☁️';if(c>=64)return'🌧️';return'☁️';}
 function wmoToLabel(c){
   if(c===0)return'Clear sky';if(c<=2)return'Partly cloudy';if(c<=3)return'Overcast';
