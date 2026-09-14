@@ -874,7 +874,7 @@ async function loadWeather(){
     const todayAvg=dayAvgFeelsLike(today);
     const avgTemp=todayAvg.temp!==null?todayAvg.temp:10;
     const worstCode=todayAvg.code;
-    weather={tempC:avgTemp,condition:wmoToCondition(worstCode,d.daily.precipitation_probability[0]),label:wmoToLabel(worstCode),icon:wmoToIcon(worstCode)};
+    weather={tempC:avgTemp,condition:wmoToCondition(worstCode,(d.daily.precipitation_probability||[])[0]),label:wmoToLabel(worstCode),icon:wmoToIcon(worstCode)};
     // All forecast days — today reuses weather object, future days calculate their own
     forecast=d.daily.time.map((date,i)=>{
       if(i===0){
@@ -884,7 +884,7 @@ async function loadWeather(){
       const avg=dayAvgFeelsLike(date);
       const tempC=avg.temp!==null?avg.temp:10;
       const code=avg.code||d.daily.weathercode[i];
-      return{date,tempC,condition:wmoToCondition(code,d.daily.precipitation_probability[i]),icon:wmoToIcon(code),label:wmoToLabel(code)};
+      return{date,tempC,condition:wmoToCondition(code,(d.daily.precipitation_probability||[])[i]),icon:wmoToIcon(code),label:wmoToLabel(code)};
     });
     document.getElementById('wpill-line1').textContent=`Seattle · ${weather.icon} ${weather.label}`;
     document.getElementById('wpill-line2').textContent=`avg. fl. ${avgTemp}°C / ${toF(avgTemp)}°F · ${tempToBand(avgTemp)}`;
