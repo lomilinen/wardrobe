@@ -1629,6 +1629,11 @@ async function confirmWornFromDetail(){
       ...allWorn.map(pid=>{const it=getItem(pid);return it?apiCall({action:'updateItem',data:it}):Promise.resolve();})
     ]);
     if(res.some(r=>r&&r.error))throw new Error('Failed to save outfit log');
+    // Clear cache so next reload fetches fresh data
+    localStorage.removeItem(CACHE_KEYS.items);
+    localStorage.removeItem(CACHE_KEYS.outfits);
+    localStorage.removeItem(CACHE_KEYS.logs);
+    localStorage.removeItem(CACHE_KEYS.ts);
     showToast('Outfit logged!');
   }catch(err){
     showToast(`Error logging: ${err.message}. Refresh the app to check.`);
@@ -1936,6 +1941,11 @@ async function confirmWorn(){
         showSavingOverlay();
         const res=await apiCall({action:'updateLog',data:existingLog});
         if(res.error)throw new Error(res.error);
+        // Clear cache so next reload fetches fresh data
+        localStorage.removeItem(CACHE_KEYS.items);
+        localStorage.removeItem(CACHE_KEYS.outfits);
+        localStorage.removeItem(CACHE_KEYS.logs);
+        localStorage.removeItem(CACHE_KEYS.ts);
         showToast('Log updated!');
       }catch(err){
         showToast(`Error updating: ${err.message}. Refresh the app to check.`);
@@ -3351,6 +3361,11 @@ async function deleteLog(logId,dateStr,isFuture){
     updatedItems.forEach(item=>savePromises.push(apiCall({action:'updateItem',data:item})));
     const res=await Promise.all(savePromises);
     if(res.some(r=>r&&r.error))throw new Error('Failed to delete log');
+    // Clear cache so next reload fetches fresh data
+    localStorage.removeItem(CACHE_KEYS.items);
+    localStorage.removeItem(CACHE_KEYS.outfits);
+    localStorage.removeItem(CACHE_KEYS.logs);
+    localStorage.removeItem(CACHE_KEYS.ts);
     showToast('Removed from calendar');
   }catch(err){
     showToast(`Error removing: ${err.message}. Refresh the app to check.`);
