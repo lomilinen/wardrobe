@@ -1776,13 +1776,9 @@ function editLogAccFromSheet(logId,outfitId){
   const log=wornLogs.find(l=>l.id===logId);
   const o=outfits.find(x=>x.id===outfitId);
   if(!log||!o)return;
-  const hasLinkedAcc=ACC_CATS.some(cat=>(o.accByCat[cat]||[]).length>0);
-  if(!hasLinkedAcc){
-    closeDayDetail();
-    showToast('No accessories linked — edit them from the Outfits tab');
-    return;
-  }
+  // Set editingLogId and date FIRST - these must persist
   editingLogId=logId;
+  pendingWearDateStr=log.date;
   closeDayDetail();
   openWearing(outfitId,log.date);
 }
