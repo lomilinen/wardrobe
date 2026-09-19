@@ -1434,6 +1434,9 @@ function openWearingFromLovedLog(logId){
   if(!log)return;
   const o=outfits.find(x=>x.id===log.outfitId);
   if(!o)return;
+  // Clear editingLogId - this should create a NEW log, not edit the old one
+  editingLogId=null;
+  pendingWearDateStr=null;
   // Pre-populate accByCat from log accessories for wearing screen
   const logAccByCat={};
   (log.accessories||[]).forEach(aid=>{
@@ -1444,7 +1447,7 @@ function openWearingFromLovedLog(logId){
   const existing=outfits.find(x=>x.id===o.id);
   const savedAccByCat=existing?{...existing.accByCat}:{}; 
   if(existing)existing.accByCat=logAccByCat;
-  openWearing(o.id,null);
+  openWearing(o.id,todayStr()); // Open with TODAY, not the old log date
   // Restore after openWearing reads accByCat
   if(existing)existing.accByCat=savedAccByCat;
 }
