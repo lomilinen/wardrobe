@@ -760,7 +760,7 @@ const WARDROBE_SORT_LABELS=['Default','Least worn','Most worn','Fewest outfits',
 let wardrobeSortIdx=0;
 
 const WARDROBE_TYPES=['','everyday','work','occasion','unavailable'];
-const WARDROBE_TYPE_LABELS=['All types','Everyday','🎉 Occasion','🚫 Unavailable'];
+const WARDROBE_TYPE_LABELS=['All types','Everyday','💼 Work','🎉 Occasion','🚫 Unavailable'];
 let wardrobeTypeIdx=0;
 
 // Outfits sort/type state
@@ -802,7 +802,7 @@ async function bulkSetUnavailable(makeUnavailable){
   for(const id of ids){
     const item=items.find(i=>i.id===id);
     if(!item)continue;
-    try{await fetch(API,{method:'POST',body:JSON.stringify({action:'updateItem',item})});}
+    try{await apiCall({action:'updateItem',data:item});}
     catch(e){console.error('bulkSetUnavailable',e);}
   }
 }
@@ -998,7 +998,7 @@ async function init(){
       renderWardrobe();
       setDotStatus('fresh'); // green — fresh data loaded
     } else {
-      setDotStatus(cache?'error':'error');
+      setDotStatus(cache?'loading':'error');
     }
   } catch(e){
     console.warn('Fetch failed, using cache',e);
