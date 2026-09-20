@@ -739,7 +739,7 @@ function tempToBand(c){
   return'Warm';
 }
 
-let items=[],outfits=[],wornLogs=[];
+let items=[],outfits=[],wornLogs=[],trips=[];
 let weather={tempC:null,condition:'',label:'',icon:'☁️'};
 let forecast=[];
 let currentCat='all',calYear,calMonth;
@@ -3425,7 +3425,6 @@ async function recalculateWornStats(){
   console.log("Done.");
 }
 // ===== TRIPS =====
-let trips=[];
 let currentTripId=null;
 let tripEditSelected=new Set();
 let tripEditIsNew=false;
