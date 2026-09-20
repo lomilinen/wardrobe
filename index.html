@@ -1437,6 +1437,7 @@ function openWearingFromLovedLog(logId){
   // Clear editingLogId - this should create a NEW log, not edit the old one
   editingLogId=null;
   isWearingLovedOutfit=true;
+  lovedOutfitAccessories=log.accessories||[]; // Store for selection later
   pendingWearDateStr=null;
   // Pre-populate accByCat from log accessories for wearing screen
   const logAccByCat={};
@@ -1785,6 +1786,7 @@ function editLogAccFromSheet(logId,outfitId){
   // Set editingLogId and date FIRST - these must persist
   editingLogId=logId;
   isWearingLovedOutfit=false; // Normal log edit, not a loved outfit wear
+  lovedOutfitAccessories=[];
   pendingWearDateStr=log.date;
   closeDayDetail();
   openWearing(outfitId,log.date);
@@ -1843,7 +1845,8 @@ async function deleteOutfitFromDetail(){
 
 // ===== WEARING FLOW =====
 function openWearingNormal(outfitId,dateOverride){
-  isWearingLovedOutfit=false;  // Normal outfit wear, not a loved outfit
+  isWearingLovedOutfit=false;
+  lovedOutfitAccessories=[];
   openWearing(outfitId,dateOverride);
 }
 
@@ -1913,17 +1916,18 @@ function openWearing(outfitId,dateOverride){
       });
     }
   }else if(isWearingLovedOutfit){
-    // For loved outfits, accessories are in the outfit's accByCat
-    const o=outfits.find(x=>x.id===wearingOutfitId);
-    if(o){
-      Object.values(o.accByCat||{}).flat().forEach(id=>{
-        const el=document.getElementById(`aopt-${id}`);
-        if(el)el.classList.add('selected');
-      });
-    }
+    // For loved outfits, use the stored accessories
+    lovedOutfitAccessories.forEach(id=>{
+      const el=document.getElementById(`aopt-${id}`);
+      if(el)el.classList.add('selected');
+    });
   }
 
-  document.getElementById('wearing-edit-acc-btn').style.display=isWearingLovedOutfit?'none':'block';
+  if(isWearingLovedOutfit){
+    document.getElementById('wearing-edit-acc-btn').style.setProperty('display', 'none', 'important');
+  }else{
+    document.getElementById('wearing-edit-acc-btn').style.display='block';
+  }
   document.getElementById('wearing-screen').classList.add('open');
 }
 
@@ -2014,6 +2018,7 @@ function closeWearing(){
   document.getElementById('wearing-screen').classList.remove('open');
   wearingOutfitId=null;
   isWearingLovedOutfit=false;
+  lovedOutfitAccessories=[];
   tripPackedIds=null;
 }
 
@@ -3529,6 +3534,7 @@ function openWearingFromTrip(outfitId,tripId){
   const packedIds=new Set(t.items||[]);
   // Open wearing but grey out accessories not in packed list
   isWearingLovedOutfit=false;  // Normal outfit wear
+  lovedOutfitAccessories=[];
   tripPackedIds=packedIds;
   openWearing(outfitId,null);
 }
