@@ -487,7 +487,7 @@ html.force-dark-mode{
   <div style="margin-top:1.25rem;" class="sec-label">Core pieces</div>
   <div class="wearing-core" id="wearing-core"></div>
   <div id="wearing-acc-sections"></div>
-  <button class="btn-outline" style="width:100%;margin-top:0.75rem;" onclick="openEditAccFromWearing()">Edit accessories</button>
+  <button class="btn-outline" id="wearing-edit-acc-btn" style="width:100%;margin-top:0.75rem;" onclick="openEditAccFromWearing()">Edit accessories</button>
   <button class="confirm-btn" onclick="confirmWorn()">Log this outfit</button>
 </div>
 
@@ -1841,6 +1841,7 @@ async function deleteOutfitFromDetail(){
 
 // ===== WEARING FLOW =====
 function openWearing(outfitId,dateOverride){
+  isWearingLovedOutfit=false; // Reset - only loved outfit flow sets it true
   pendingWearDateStr=dateOverride||null;
   wearingOutfitId=outfitId;
   const o=outfits.find(x=>x.id===outfitId);
@@ -1895,7 +1896,7 @@ function openWearing(outfitId,dateOverride){
     }
   });
 
-  // Pre-select previously chosen accessories when editing a past log
+  // Pre-select previously chosen accessories when editing a past log OR wearing a loved outfit
   if(editingLogId){
     const log=wornLogs.find(l=>l.id===editingLogId);
     if(log){
@@ -1904,8 +1905,18 @@ function openWearing(outfitId,dateOverride){
         if(el)el.classList.add('selected');
       });
     }
+  }else if(isWearingLovedOutfit){
+    // For loved outfits, accessories are in the outfit's accByCat
+    const o=outfits.find(x=>x.id===wearingOutfitId);
+    if(o){
+      Object.values(o.accByCat||{}).flat().forEach(id=>{
+        const el=document.getElementById(`aopt-${id}`);
+        if(el)el.classList.add('selected');
+      });
+    }
   }
 
+  document.getElementById('wearing-edit-acc-btn').style.display=isWearingLovedOutfit?'none':'block';
   document.getElementById('wearing-screen').classList.add('open');
 }
 
@@ -1995,6 +2006,7 @@ function openEditAccFromWearing(){
 function closeWearing(){
   document.getElementById('wearing-screen').classList.remove('open');
   wearingOutfitId=null;
+  isWearingLovedOutfit=false;
   tripPackedIds=null;
 }
 
