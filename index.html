@@ -1776,6 +1776,7 @@ async function saveEditAcc(){
 
 let editingLogId=null;
 let isWearingLovedOutfit=false;
+let lovedOutfitAccessories=[]; // Store accessories for loved outfit wearing flow
 
 function editLogAccFromSheet(logId,outfitId){
   const log=wornLogs.find(l=>l.id===logId);
@@ -1783,6 +1784,7 @@ function editLogAccFromSheet(logId,outfitId){
   if(!log||!o)return;
   // Set editingLogId and date FIRST - these must persist
   editingLogId=logId;
+  isWearingLovedOutfit=false; // Normal log edit, not a loved outfit wear
   pendingWearDateStr=log.date;
   closeDayDetail();
   openWearing(outfitId,log.date);
@@ -1840,8 +1842,13 @@ async function deleteOutfitFromDetail(){
 }
 
 // ===== WEARING FLOW =====
+function openWearingNormal(outfitId,dateOverride){
+  isWearingLovedOutfit=false;  // Normal outfit wear, not a loved outfit
+  openWearing(outfitId,dateOverride);
+}
+
 function openWearing(outfitId,dateOverride){
-  isWearingLovedOutfit=false; // Reset - only loved outfit flow sets it true
+  // isWearingLovedOutfit is set by calling function (openWearingFromLovedLog=true, others=false)
   pendingWearDateStr=dateOverride||null;
   wearingOutfitId=outfitId;
   const o=outfits.find(x=>x.id===outfitId);
@@ -3134,7 +3141,7 @@ function renderSuggestionPage(wrap,pages,pageIdx,dateStr,isFuture,pool,tempC,con
     col.style.cssText='background:var(--cream);border-radius:var(--rsm);overflow:hidden;cursor:pointer;border:1px solid var(--border);';
     col.innerHTML=`${buildFlatlayCore(o.id)}
       <div style="padding:6px;display:flex;justify-content:center;">
-        <button class="wear-btn" style="font-size:10px;padding:5px 10px;" onclick="closeDayDetail();openWearing('${o.id}','${dateStr}')">Wearing this</button>
+        <button class="wear-btn" style="font-size:10px;padding:5px 10px;" onclick="closeDayDetail();openWearingNormal('${o.id}','${dateStr}')">Wearing this</button>
       </div>`;
     grid.appendChild(col);
   });
@@ -3521,6 +3528,7 @@ function openWearingFromTrip(outfitId,tripId){
   if(!t)return;
   const packedIds=new Set(t.items||[]);
   // Open wearing but grey out accessories not in packed list
+  isWearingLovedOutfit=false;  // Normal outfit wear
   tripPackedIds=packedIds;
   openWearing(outfitId,null);
 }
