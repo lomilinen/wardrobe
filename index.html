@@ -334,9 +334,27 @@ html.force-dark-mode{
 .trip-select-item.selected{border-color:var(--sage);}
 .trip-select-check{position:absolute;top:3px;right:3px;width:16px;height:16px;border-radius:50%;background:var(--sage);display:none;align-items:center;justify-content:center;}
 .trip-select-item.selected .trip-select-check{display:flex;}
+/* PASSWORD OVERLAY */
+.password-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:var(--cream);display:flex;align-items:center;justify-content:center;z-index:9999;backdrop-filter:blur(5px);}
+.password-overlay.hidden{display:none;}
+.password-form{background:var(--warm);border:1px solid var(--border);border-radius:var(--r);padding:2rem;max-width:300px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,0.1);}
+.password-form h2{font-family:'Cormorant Garamond',serif;font-size:24px;margin-bottom:1rem;color:var(--ink);}
+.password-form input{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:var(--rsm);font-family:'DM Sans',sans-serif;font-size:14px;margin-bottom:1rem;box-sizing:border-box;}
+.password-form input:focus{outline:none;border-color:var(--sage);background:var(--cream);}
+.password-form button{width:100%;padding:10px 12px;background:var(--sage);color:var(--cream);border:none;border-radius:var(--rsm);font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;cursor:pointer;transition:background .2s;}
+.password-form button:hover{background:var(--sage-dark);}
+.password-error{color:var(--rose);font-size:12px;margin-top:0.5rem;min-height:16px;}
 </style>
 </head>
 <body>
+<div class="password-overlay" id="password-overlay">
+  <div class="password-form">
+    <h2>your wardrobe</h2>
+    <input type="password" id="password-input" placeholder="Enter password" onkeypress="if(event.key==='Enter')checkPassword()">
+    <button onclick="checkPassword()">Access</button>
+    <div class="password-error" id="password-error"></div>
+  </div>
+</div>
 <div class="app">
   <div class="header">
     <div class="logo" style="display:flex;align-items:center;gap:7px;"><span class="wdot status-loading" id="data-dot"></span>your <em>wardrobe</em></div>
@@ -703,6 +721,31 @@ html.force-dark-mode{
 </div>
 
 <script>
+// ===== PASSWORD PROTECTION =====
+const WARDROBE_PASSWORD='wardrobe'; // Change this to your preferred password
+function checkPassword(){
+  const input=document.getElementById('password-input');
+  const error=document.getElementById('password-error');
+  if(input.value===WARDROBE_PASSWORD){
+    sessionStorage.setItem('wardrobeAuth','true');
+    document.getElementById('password-overlay').classList.add('hidden');
+    input.value='';
+  }else{
+    error.textContent='Incorrect password';
+    input.value='';
+    input.focus();
+  }
+}
+function initPasswordCheck(){
+  if(!sessionStorage.getItem('wardrobeAuth')){
+    document.getElementById('password-overlay').classList.remove('hidden');
+    document.getElementById('password-input').focus();
+  }else{
+    document.getElementById('password-overlay').classList.add('hidden');
+  }
+}
+window.addEventListener('load',initPasswordCheck);
+
 const API='https://script.google.com/macros/s/AKfycbx3fKHJ_EP0AkUb5fUC41iGn1jq2S74IITVpLwLz7_WmDfAfEqIEPOjIS7yTmBborE6/exec';
 const LAT=47.6062,LON=-122.3321;
 
@@ -1012,8 +1055,7 @@ async function init(){
 
 function normalizeItem(i){
   let img=i.img||'';
-  if(img.includes('&st='))img=img.replace(/&st=[^&]*/,'');
-  else if(img.includes('?st='))img=img.replace(/\?st=[^&]*/,'');
+  img=img.replace(/[?&]st=[^&]*/g,'').replace(/[?&]$/,'');
   return{...i,img,
     seasons:parseArr(i.seasons),
     conditions:parseArr(i.conditions),
