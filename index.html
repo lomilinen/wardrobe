@@ -730,6 +730,7 @@ function checkPassword(){
     sessionStorage.setItem('wardrobeAuth','true');
     document.getElementById('password-overlay').classList.add('hidden');
     input.value='';
+    init(); // Initialize app only after password is correct
   }else{
     error.textContent='Incorrect password';
     input.value='';
@@ -742,6 +743,7 @@ function initPasswordCheck(){
     document.getElementById('password-input').focus();
   }else{
     document.getElementById('password-overlay').classList.add('hidden');
+    init(); // If already authenticated, initialize app
   }
 }
 window.addEventListener('load',initPasswordCheck);
@@ -1845,6 +1847,7 @@ async function saveEditAccForLog(){
     const newAccs=Object.values(editAccState).flat();
     log.accessories=newAccs;
     closeEditAcc();
+    openWearing(editAccOutfitId, pendingWearDateStr); // Re-render wearing modal with updated accessories
     editingLogId=null;
     renderCalendar();
     try{
@@ -3813,7 +3816,6 @@ function applyTimeDarkMode(){
 
 // ===== INIT =====
 applyTimeDarkMode();
-init();
 </script>
 </body>
 </html>
