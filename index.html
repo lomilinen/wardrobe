@@ -2459,6 +2459,7 @@ function renderPairedOutfits(){
     }
     return`<div class="paired-outfit-card${isMarked?' marked-remove':''}${isBulkSel?' outfit-card-selected':''}${isUnavailablePaired?' icard-unavailable':''}" onclick="${clickAction}">
       ${flHtml||'<div style="height:40px;display:flex;align-items:center;justify-content:center;font-size:18px;">👗</div>'}
+      <div style="font-size:11px;color:var(--ink-muted);text-align:center;margin-top:4px;">${o.wornCount||0}x ${daysSince(o.lastWorn)}d ago</div>
       ${isMarked?'<div class="paired-remove-badge">Unlink</div>':''}
       ${isBulkSel?'<div class="paired-remove-badge" style="background:var(--sage);">✓</div>':''}
       ${!pairedBulkMode?`<button class="paired-outfit-open-btn" onclick="event.stopPropagation();openOutfitFromItem('${o.id}')">Open</button>`:''}
