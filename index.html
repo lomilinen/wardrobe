@@ -730,7 +730,15 @@ function checkPassword(){
     sessionStorage.setItem('wardrobeAuth','true');
     document.getElementById('password-overlay').classList.add('hidden');
     input.value='';
-    setTimeout(()=>init(),500); // Increased delay to ensure DOM and all app elements are ready
+    const cache=loadCache();
+    if(cache){
+      items=Array.isArray(cache.itemsData)?cache.itemsData.map(normalizeItem):[];
+      wornLogs=Array.isArray(cache.logsData)?cache.logsData:[];
+      outfits=Array.isArray(cache.outfitsData)?cache.outfitsData.map(normalizeOutfit):[];
+      renderCalendar();
+      renderWardrobe();
+    }
+    setTimeout(()=>init(),50);
   }else{
     error.textContent='Incorrect password';
     input.value='';
@@ -743,7 +751,15 @@ function initPasswordCheck(){
     document.getElementById('password-input').focus();
   }else{
     document.getElementById('password-overlay').classList.add('hidden');
-    setTimeout(()=>init(),500); // Increased delay to ensure DOM and all app elements are ready
+    const cache=loadCache();
+    if(cache){
+      items=Array.isArray(cache.itemsData)?cache.itemsData.map(normalizeItem):[];
+      wornLogs=Array.isArray(cache.logsData)?cache.logsData:[];
+      outfits=Array.isArray(cache.outfitsData)?cache.outfitsData.map(normalizeOutfit):[];
+      renderCalendar();
+      renderWardrobe();
+    }
+    setTimeout(()=>init(),50);
   }
 }
 window.addEventListener('load',initPasswordCheck);
