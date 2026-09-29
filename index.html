@@ -916,26 +916,32 @@ function hideSavingOverlay(){
 
 // ===== WEATHER =====
 async function loadWeather(){
+  // Safe defaults if API fails
+  let weather={tempC:10,condition:'',label:'Unknown',icon:'❓'};
+  let forecast=[];
+  
   try{
-    // Fetch hourly apparent_temperature and weathercode (8am-8pm daytime average)
-    const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&hourly=apparent_temperature,weathercode&daily=weathercode&forecast_days=10`);
+    // Fetch hourly apparent_temperature, weathercode, and precipitation_probability (8am-8pm daytime average)
+    const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&hourly=apparent_temperature,weathercode,precipitation_probability&daily=weathercode&forecast_days=10`);
     const d=await r.json();
     // Helper: get daytime avg feels-like for a given date string
     function dayAvgFeelsLike(dateStr){
-      const hrs=d.hourly.time.map((t,i)=>({t,temp:d.hourly.apparent_temperature[i],code:d.hourly.weathercode[i]}))
+      const hrs=d.hourly.time.map((t,i)=>({t,temp:d.hourly.apparent_temperature[i],code:d.hourly.weathercode[i],precip:d.hourly.precipitation_probability[i]}))
         .filter(h=>{const hr=new Date(h.t).getHours();return hr>=8&&hr<=20;})
         .filter(h=>h.t.startsWith(dateStr));
       return hrs.length?{
         temp:Math.round(hrs.reduce((s,h)=>s+h.temp,0)/hrs.length),
-        code:Math.max(...hrs.map(h=>h.code))
-      }:{temp:null,code:d.daily.weathercode[0]};
+        code:Math.max(...hrs.map(h=>h.code)),
+        maxPrecip:Math.max(...hrs.map(h=>h.precip||0))
+      }:{temp:null,code:d.daily.weathercode[0],maxPrecip:0};
     }
     // Today — calculate once, reuse in both pill and forecast
     const today=d.daily.time[0];
     const todayAvg=dayAvgFeelsLike(today);
     const avgTemp=todayAvg.temp!==null?todayAvg.temp:10;
     const worstCode=todayAvg.code;
-    weather={tempC:avgTemp,condition:wmoToCondition(worstCode),label:wmoToLabel(worstCode),icon:wmoToIcon(worstCode)};
+    const isRainy=worstCode>=64||todayAvg.maxPrecip>=40;
+    weather={tempC:avgTemp,condition:isRainy?'rainy':'',label:wmoToLabel(worstCode),icon:wmoToIcon(worstCode)};
     // All forecast days — today reuses weather object, future days calculate their own
     forecast=d.daily.time.map((date,i)=>{
       if(i===0){
@@ -945,7 +951,8 @@ async function loadWeather(){
       const avg=dayAvgFeelsLike(date);
       const tempC=avg.temp!==null?avg.temp:10;
       const code=avg.code||d.daily.weathercode[i];
-      return{date,tempC,condition:wmoToCondition(code),icon:wmoToIcon(code),label:wmoToLabel(code)};
+      const precipRainy=avg.maxPrecip>=40;
+      return{date,tempC,condition:(code>=64||precipRainy)?'rainy':'',icon:wmoToIcon(code),label:wmoToLabel(code)};
     });
     document.getElementById('wpill-line1').textContent=`Seattle · ${weather.icon} ${weather.label}`;
     document.getElementById('wpill-line2').textContent=`avg. fl. ${avgTemp}°C / ${toF(avgTemp)}°F · ${tempToBand(avgTemp)}`;
