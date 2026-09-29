@@ -917,8 +917,8 @@ function hideSavingOverlay(){
 // ===== WEATHER =====
 async function loadWeather(){
   // Safe defaults if API fails
-  let weather={tempC:10,condition:'',label:'Unknown',icon:'❓'};
-  let forecast=[];
+  weather={tempC:10,condition:'',label:'Unknown',icon:'❓'};
+  forecast=[];
   
   try{
     // Fetch hourly apparent_temperature, weathercode, and precipitation_probability (8am-8pm daytime average)
