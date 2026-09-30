@@ -916,9 +916,16 @@ function hideSavingOverlay(){
 
 // ===== WEATHER =====
 async function loadWeather(){
-  // Safe defaults if API fails
-  weather={tempC:10,condition:'',label:'Unknown',icon:'❓'};
+  // Safe defaults if API fails - initialize with loading placeholders for next 10 days
+  const today=new Date();
+  weather={tempC:10,condition:'',label:'Unknown',icon:'⏳'};
   forecast=[];
+  for(let i=0;i<10;i++){
+    const d=new Date(today);
+    d.setDate(d.getDate()+i);
+    const dateStr=d.toISOString().split('T')[0];
+    forecast.push({date:dateStr,tempC:'?',condition:'',icon:'⏳',label:'Loading...'});
+  }
   
   try{
     // Fetch hourly apparent_temperature, weathercode, and precipitation_probability (8am-8pm daytime average)
