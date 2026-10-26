@@ -134,7 +134,7 @@ html.force-dark-mode{
 .acc-edit-thumb{width:60px;height:60px;border-radius:var(--rsm);background:var(--warm);border:2px solid var(--border);overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:24px;transition:border-color .15s;}
 .acc-edit-thumb img{width:100%;height:100%;object-fit:contain;}
 .acc-edit-item.linked .acc-edit-thumb{border-color:var(--sage);box-shadow:0 0 0 1px var(--sage);}
-.acc-edit-item.greyed{opacity:.3;pointer-events:none;}
+.acc-edit-item.greyed{opacity:.5;}
 .acc-edit-save-btn{width:100%;padding:13px;border-radius:var(--rsm);background:var(--ink);color:var(--warm);border:none;font-size:14px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;margin-top:1.5rem;}
 
 /* WEARING FLOW */
@@ -1214,6 +1214,8 @@ function weatherOk(o,tempC,condition){
 function accWeatherOk(a,tempC,condition){
   if(a.occasion)return false;
   if(a.unavailable)return false;
+  // Rainy days: rain-tag categories need an explicit rainy tag (same rule as core pieces in weatherOk)
+  if(condition==='rainy'&&RAINY_TAG_CATS.includes(a.cat)&&!(a.conditions||[]).includes('rainy'))return false;
   if(tempC===null||tempC===undefined)return true;
   const s=SEASON_TAG_CATS.includes(a.cat)?(a.seasons||[]):[];
   const c=RAINY_TAG_CATS.includes(a.cat)?(a.conditions||[]):[];
@@ -1609,7 +1611,7 @@ function openOutfitDetail(outfitId,returnTo,workMode){
   accSummary.innerHTML='';
   let hasAnyAcc=false;
   ACC_CATS.forEach(cat=>{
-    let linked=(o.accByCat[cat]||[]).map(id=>getItem(id)).filter(Boolean);
+    let linked=(o.accByCat[cat]||[]).map(id=>getItem(id)).filter(Boolean).filter(a=>!a.unavailable);
     // In work mode, filter accessories by work flag
     if(currentOutfitDetailWorkMode&&isWorkOutfit(o)){
       // If category can have work toggle (shoes, bags), require work=true
@@ -1771,7 +1773,7 @@ function openEditAccFromDetail(){
       <div class="acc-edit-options" id="eacc-cat-${cat}">
         ${allCatItems.map(a=>{
           const isLinked=(editAccState[cat]||[]).includes(a.id);
-          const isGreyed=!accCompatibleWithOutfit(a,outfitSeasons)||!!a.unavailable;
+          const isGreyed=!accCompatibleWithOutfit(a,outfitSeasons);
           return`<div class="acc-edit-item${isLinked?' linked':''}${isGreyed?' greyed':''}" id="eacc-${cat}-${a.id}" onclick="toggleEditAcc('${cat}','${a.id}')">
             <div class="acc-edit-thumb">${a.img?`<img src="${a.img}" loading="lazy">`:`<span>${a.emoji||'💍'}</span>`}</div>
           </div>`;
@@ -1812,7 +1814,7 @@ async function saveEditAcc(){
   accSummary.innerHTML='';
   let hasAnyAcc=false;
   ACC_CATS.forEach(cat=>{
-    let linked=(o.accByCat[cat]||[]).map(id=>getItem(id)).filter(Boolean);
+    let linked=(o.accByCat[cat]||[]).map(id=>getItem(id)).filter(Boolean).filter(a=>!a.unavailable);
     // Apply work mode filtering (same as in openOutfitDetail)
     if(currentOutfitDetailWorkMode&&isWorkOutfit(o)){
       linked=linked.filter(a=>{
@@ -1827,7 +1829,7 @@ async function saveEditAcc(){
     div.innerHTML=`<div class="sec-label" style="margin-bottom:8px;">${CATS[cat].label}</div>
       <div class="acc-options">
         ${linked.map(a=>`
-          <div class="acc-option" id="dopt-${a.id}" onclick="${a.unavailable?'':'toggleDetailAcc(\''+a.id+'\')'}" style="${a.unavailable?'opacity:0.5;cursor:not-allowed;':''}">
+          <div class="acc-option" id="dopt-${a.id}" onclick="toggleDetailAcc('${a.id}')">
             <div class="acc-option-thumb">${a.img?`<img src="${a.img}" loading="lazy">`:`<span>${a.emoji||'💍'}</span>`}</div>
           </div>`).join('')}
       </div>`;
@@ -2122,7 +2124,7 @@ function renderWardrobe(){
   }
 
   function applySort(arr){
-    if(!sortVal)return arr;
+    if(!sortVal)return arr.filter(i=>!i.unavailable).concat(arr.filter(i=>i.unavailable));
     return arr.slice().sort((a,b)=>{
       if(sortVal==='most-worn')return(b.wornCount||0)-(a.wornCount||0);
       if(sortVal==='least-worn')return(a.wornCount||0)-(b.wornCount||0);
