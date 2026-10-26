@@ -134,7 +134,9 @@ html.force-dark-mode{
 .acc-edit-thumb{width:60px;height:60px;border-radius:var(--rsm);background:var(--warm);border:2px solid var(--border);overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:24px;transition:border-color .15s;}
 .acc-edit-thumb img{width:100%;height:100%;object-fit:contain;}
 .acc-edit-item.linked .acc-edit-thumb{border-color:var(--sage);box-shadow:0 0 0 1px var(--sage);}
-.acc-edit-item.greyed{opacity:.5;}
+.acc-edit-item.greyed{opacity:.75;}
+.acc-edit-item.greyed .acc-edit-thumb{background:var(--border-mid);}
+.acc-edit-item.greyed .acc-edit-thumb img{opacity:.5;filter:grayscale(1);}
 .acc-edit-save-btn{width:100%;padding:13px;border-radius:var(--rsm);background:var(--ink);color:var(--warm);border:none;font-size:14px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;margin-top:1.5rem;}
 
 /* WEARING FLOW */
@@ -350,7 +352,7 @@ html.force-dark-mode{
 <div class="password-overlay" id="password-overlay">
   <div class="password-form">
     <h2>your wardrobe</h2>
-    <input type="password" id="password-input" placeholder="Enter password" onkeypress="if(event.key==='Enter')checkPassword()">
+    <input type="password" id="password-input" placeholder="Enter passphrase" onkeypress="if(event.key==='Enter')checkPassword()">
     <button onclick="checkPassword()">Access</button>
     <div class="password-error" id="password-error"></div>
   </div>
@@ -721,45 +723,57 @@ html.force-dark-mode{
 </div>
 
 <script>
-// ===== PASSWORD PROTECTION =====
-const WARDROBE_PASSWORD='2020'; // Change this to your preferred password
-function checkPassword(){
+// ===== PASSPHRASE PROTECTION =====
+// The passphrase is NOT stored in this file. The Apps Script checks it (Script Property APP_PASSPHRASE)
+// and this device keeps it after a successful unlock.
+function getKey(){try{return localStorage.getItem('wardrobeKey')||'';}catch(e){return '';}}
+function bootFromCache(){
+  const cache=loadCache();
+  if(cache){
+    items=Array.isArray(cache.itemsData)?cache.itemsData.map(normalizeItem):[];
+    wornLogs=Array.isArray(cache.logsData)?cache.logsData:[];
+    outfits=Array.isArray(cache.outfitsData)?cache.outfitsData.map(normalizeOutfit):[];
+    renderCalendar();
+    renderWardrobe();
+  }
+  setTimeout(()=>init(),50);
+}
+function lockApp(msg){
+  try{localStorage.removeItem('wardrobeKey');}catch(e){}
+  document.getElementById('password-overlay').classList.remove('hidden');
+  const error=document.getElementById('password-error');
+  if(error)error.textContent=msg||'Please enter your passphrase again';
+  const input=document.getElementById('password-input');
+  if(input){input.value='';input.focus();}
+}
+async function checkPassword(){
   const input=document.getElementById('password-input');
   const error=document.getElementById('password-error');
-  if(input.value===WARDROBE_PASSWORD){
-    sessionStorage.setItem('wardrobeAuth','true');
+  const entered=input.value;
+  if(!entered)return;
+  error.textContent='Checking...';
+  const res=await apiCall({action:'checkAuth'},entered);
+  if(res&&res.ok){
+    try{localStorage.setItem('wardrobeKey',entered);}catch(e){}
     document.getElementById('password-overlay').classList.add('hidden');
     input.value='';
-    const cache=loadCache();
-    if(cache){
-      items=Array.isArray(cache.itemsData)?cache.itemsData.map(normalizeItem):[];
-      wornLogs=Array.isArray(cache.logsData)?cache.logsData:[];
-      outfits=Array.isArray(cache.outfitsData)?cache.outfitsData.map(normalizeOutfit):[];
-      renderCalendar();
-      renderWardrobe();
-    }
-    setTimeout(()=>init(),50);
-  }else{
-    error.textContent='Incorrect password';
+    error.textContent='';
+    bootFromCache();
+  }else if(res&&res.error==='Unauthorized'){
+    error.textContent='Incorrect passphrase';
     input.value='';
     input.focus();
+  }else{
+    error.textContent='Could not reach the server. Try again.';
   }
 }
 function initPasswordCheck(){
-  if(!sessionStorage.getItem('wardrobeAuth')){
+  if(!getKey()){
     document.getElementById('password-overlay').classList.remove('hidden');
     document.getElementById('password-input').focus();
   }else{
     document.getElementById('password-overlay').classList.add('hidden');
-    const cache=loadCache();
-    if(cache){
-      items=Array.isArray(cache.itemsData)?cache.itemsData.map(normalizeItem):[];
-      wornLogs=Array.isArray(cache.logsData)?cache.logsData:[];
-      outfits=Array.isArray(cache.outfitsData)?cache.outfitsData.map(normalizeOutfit):[];
-      renderCalendar();
-      renderWardrobe();
-    }
-    setTimeout(()=>init(),50);
+    bootFromCache();
   }
 }
 window.addEventListener('load',initPasswordCheck);
@@ -884,10 +898,26 @@ function cycleOutfitsType(){
 }
 
 // ===== API =====
-async function apiCall(params){
-  const url=new URL(API);
-  Object.entries(params).forEach(([k,v])=>url.searchParams.set(k,typeof v==='object'?JSON.stringify(v):v));
-  try{const r=await fetch(url);return r.json();}catch(e){return{error:e.toString()};}
+const USE_POST=true; // true: key and data travel in the request body. false: falls back to GET (key would then be in the URL)
+async function apiCall(params,keyOverride){
+  const key=keyOverride!==undefined?keyOverride:getKey();
+  const flat={};
+  // Same value handling as the old GET version: objects become JSON strings, everything else a string
+  Object.entries(params).forEach(([k,v])=>{flat[k]=String(typeof v==='object'?JSON.stringify(v):v);});
+  if(key)flat.key=key;
+  try{
+    let r;
+    if(USE_POST){
+      r=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(flat)});
+    }else{
+      const url=new URL(API);
+      Object.entries(flat).forEach(([k,v])=>url.searchParams.set(k,v));
+      r=await fetch(url);
+    }
+    const res=await r.json();
+    if(res&&res.error==='Unauthorized'&&keyOverride===undefined)lockApp();
+    return res;
+  }catch(e){return{error:e.toString()};}
 }
 function showSaving(){
   const el=document.getElementById('saving');
