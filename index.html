@@ -499,7 +499,7 @@ html.force-dark-mode{
 <!-- WEARING FLOW -->
 <div class="wearing-screen" id="wearing-screen">
   <button class="wearing-back" onclick="closeWearing()">&#8592; Back</button>
-  <div class="wearing-title">Complete your look</div>
+  <div class="wearing-title" id="wearing-title">Complete your look</div>
   <div class="date-pick-section" id="wearing-date-section">
     <div class="date-pick-label">Which date?</div>
     <input class="date-input" type="date" id="wearing-date-input" style="width:auto;max-width:180px;">
@@ -508,7 +508,7 @@ html.force-dark-mode{
   <div class="wearing-core" id="wearing-core"></div>
   <div id="wearing-acc-sections"></div>
   <button class="btn-outline" id="wearing-edit-acc-btn" style="width:100%;margin-top:0.75rem;" onclick="openEditAccFromWearing()">Edit accessories</button>
-  <button class="confirm-btn" onclick="confirmWorn()">Log this outfit</button>
+  <button class="confirm-btn" id="wearing-confirm-btn" onclick="confirmWorn()">Log this outfit</button>
 </div>
 
 <!-- EDIT ACCESSORIES SCREEN -->
@@ -1771,7 +1771,7 @@ function openEditAccFromDetail(){
   // If editing the outfit itself, pre-select all linked accessories
   if(editingLogId){
     const log=wornLogs.find(l=>l.id===editingLogId);
-    const wornAccs=log?log.accessories||[]:[];
+    const wornAccs=editLogSelection||(log?log.accessories||[]:[]);
     ACC_CATS.forEach(cat=>{
       editAccState[cat]=wornAccs.filter(id=>{const it=getItem(id);return it&&it.cat===cat;});
     });
@@ -1784,6 +1784,12 @@ function openEditAccFromDetail(){
 
   const content=document.getElementById('edit-acc-content');
   content.innerHTML='';
+  if(editingLogId){
+    const note=document.createElement('div');
+    note.style.cssText='font-size:12px;color:var(--ink-muted);margin-bottom:1rem;';
+    note.textContent='Editing this day only. The outfit\'s saved accessories will not change.';
+    content.appendChild(note);
+  }
   const previewDiv=document.createElement('div');
   previewDiv.style.cssText='margin-bottom:1.25rem;max-width:200px;';
   previewDiv.innerHTML=buildFlatlayCore(editAccOutfitId);
@@ -1885,6 +1891,7 @@ async function saveEditAcc(){
 }
 
 let editingLogId=null;
+let editLogSelection=null; // accessories chosen while editing a past log (only saved when you tap Update log)
 let isWearingLovedOutfit=false;
 let lovedOutfitAccessories=[]; // Store accessories for loved outfit wearing flow
 
@@ -1897,41 +1904,17 @@ function editLogAccFromSheet(logId,outfitId){
   isWearingLovedOutfit=false; // Normal log edit, not a loved outfit wear
   lovedOutfitAccessories=[];
   pendingWearDateStr=log.date;
+  editLogSelection=[...(log.accessories||[])];
   closeDayDetail();
   openWearing(outfitId,log.date);
 }
 
-async function saveEditAccForLog(){
-  const o=outfits.find(x=>x.id===editAccOutfitId);
-  if(!o)return;
-  ACC_CATS.forEach(cat=>{o.accByCat[cat]=editAccState[cat]||[];});
-  o.accessories=Object.values(o.accByCat).flat();
-  // Update the log's accessories
-  const log=wornLogs.find(l=>l.id===editingLogId);
-  if(log){
-    const newAccs=Object.values(editAccState).flat();
-    log.accessories=newAccs;
-    closeEditAcc();
-    openWearing(editAccOutfitId, pendingWearDateStr); // Re-render wearing modal with updated accessories
-    editingLogId=null;
-    renderCalendar();
-    try{
-      showSavingOverlay();
-      const res=await Promise.all([
-        apiCall({action:'updateOutfit',data:{...o,accByCat:JSON.stringify(o.accByCat)}}),
-        apiCall({action:'updateLog',data:log})
-      ]);
-      if(res.some(r=>r&&r.error))throw new Error('Failed to update');
-      showToast('Accessories updated');
-    }catch(err){
-      showToast(`Error updating: ${err.message}. Refresh the app to check.`);
-    }finally{
-      hideSavingOverlay();
-    }
-  } else {
-    closeEditAcc();
-    editingLogId=null;
-  }
+function saveEditAccForLog(){
+  // Past-log edit: apply the choice to the wearing screen only. Nothing is saved until "Update log",
+  // and the outfit's own saved accessories are never changed from here.
+  editLogSelection=Object.values(editAccState).flat();
+  closeEditAcc();
+  openWearing(editAccOutfitId,pendingWearDateStr);
 }
 
 async function deleteOutfitFromDetail(){
@@ -1972,6 +1955,16 @@ function openWearing(outfitId,dateOverride){
   dateInput.max=todayStr();
   const dateSec=document.getElementById('wearing-date-section');
   if(dateSec)dateSec.style.display=dateOverride?'none':'block';
+  const wTitle=document.getElementById('wearing-title');
+  const wConfirm=document.getElementById('wearing-confirm-btn');
+  if(editingLogId&&dateOverride){
+    const dLabel=new Date(dateOverride+'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'});
+    wTitle.textContent='Editing log for '+dLabel;
+    wConfirm.textContent='Update log';
+  }else{
+    wTitle.textContent='Complete your look';
+    wConfirm.textContent='Log this outfit';
+  }
 
   const pieces=o.pieces.map(getItem).filter(Boolean);
   document.getElementById('wearing-core').innerHTML=pieces.map(p=>`
@@ -2001,8 +1994,14 @@ function openWearing(outfitId,dateOverride){
       sections.appendChild(sec);
     } else {
       // Normal flow: show linked accessories filtered by weather
-      const linked=(accByCat[cat]||[]).map(id=>getItem(id)).filter(Boolean)
-        .filter(a=>accWeatherOk(a,weather.tempC,weather.condition));
+      let linkedIds=accByCat[cat]||[];
+      if(editingLogId){
+        // Editing a past log: outfit links plus everything already chosen for that day, no weather filter
+        const extra=(editLogSelection||[]).filter(id=>{const it=getItem(id);return it&&it.cat===cat&&!linkedIds.includes(id);});
+        linkedIds=[...linkedIds,...extra];
+      }
+      let linked=linkedIds.map(id=>getItem(id)).filter(Boolean);
+      if(!editingLogId)linked=linked.filter(a=>accWeatherOk(a,weather.tempC,weather.condition));
       if(!linked.length)return;
       const sec=document.createElement('div');
       sec.className='acc-cat-section';
@@ -2019,12 +2018,11 @@ function openWearing(outfitId,dateOverride){
   // Pre-select previously chosen accessories when editing a past log OR wearing a loved outfit
   if(editingLogId){
     const log=wornLogs.find(l=>l.id===editingLogId);
-    if(log){
-      (log.accessories||[]).forEach(id=>{
-        const el=document.getElementById(`aopt-${id}`);
-        if(el)el.classList.add('selected');
-      });
-    }
+    const selIds=editLogSelection||(log?log.accessories:null)||[];
+    selIds.forEach(id=>{
+      const el=document.getElementById(`aopt-${id}`);
+      if(el)el.classList.add('selected');
+    });
   }else if(isWearingLovedOutfit){
     // For loved outfits, use the stored accessories
     lovedOutfitAccessories.forEach(id=>{
@@ -2087,6 +2085,9 @@ async function confirmWorn(){
       }
       return;
     }
+    showToast('That log no longer exists. Nothing was saved.');
+    closeWearing();
+    return;
   }
 
   const log={
@@ -2119,13 +2120,20 @@ async function confirmWorn(){
 
 function openEditAccFromWearing(){
   if(!wearingOutfitId)return;
-  editingLogId=null;
+  if(editingLogId){
+    // Keep editing the same log; carry over whatever is currently ticked on this screen
+    editLogSelection=[...document.querySelectorAll('#wearing-acc-sections .acc-option.selected')].map(el=>el.id.replace('aopt-',''));
+  }else{
+    editingLogId=null;
+  }
   currentOutfitDetailId=wearingOutfitId;
   openEditAccFromDetail();
 }
 
 function closeWearing(){
   document.getElementById('wearing-screen').classList.remove('open');
+  editingLogId=null;
+  editLogSelection=null;
   wearingOutfitId=null;
   isWearingLovedOutfit=false;
   lovedOutfitAccessories=[];
