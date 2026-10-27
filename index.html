@@ -1788,7 +1788,7 @@ function openEditAccFromDetail(){
   if(editingLogId){
     const note=document.createElement('div');
     note.style.cssText='font-size:12px;color:var(--ink-muted);margin-bottom:1rem;';
-    note.textContent='Editing this day only. Solid green = worn that day, dashed green = linked to this outfit. The outfit\'s saved accessories will not change.';
+    note.textContent='Editing this day only. Solid green = worn that day, dashed green = linked to this outfit. Items you tick are added as options; pick what you wore on the next screen. The outfit\'s saved accessories will not change.';
     content.appendChild(note);
   }
   const previewDiv=document.createElement('div');
@@ -1893,7 +1893,8 @@ async function saveEditAcc(){
 }
 
 let editingLogId=null;
-let editLogSelection=null; // accessories chosen while editing a past log (only saved when you tap Update log)
+let editLogSelection=null; // accessories ticked as worn while editing a past log (only saved when you tap Update log)
+let editLogExtra=null; // accessories added as options while editing a past log (listed, but not auto-selected)
 let isWearingLovedOutfit=false;
 let lovedOutfitAccessories=[]; // Store accessories for loved outfit wearing flow
 
@@ -1907,14 +1908,18 @@ function editLogAccFromSheet(logId,outfitId){
   lovedOutfitAccessories=[];
   pendingWearDateStr=log.date;
   editLogSelection=[...(log.accessories||[])];
+  editLogExtra=[...(log.accessories||[])];
   closeDayDetail();
   openWearing(outfitId,log.date);
 }
 
 function saveEditAccForLog(){
-  // Past-log edit: apply the choice to the wearing screen only. Nothing is saved until "Update log",
+  // Past-log edit: ticked items become options on the wearing screen, but newly ticked ones are NOT auto-selected.
+  // Items that were already worn stay selected unless you unticked them. Nothing is saved until "Update log",
   // and the outfit's own saved accessories are never changed from here.
-  editLogSelection=Object.values(editAccState).flat();
+  const ticked=Object.values(editAccState).flat();
+  editLogSelection=(editLogSelection||[]).filter(id=>ticked.includes(id));
+  editLogExtra=[...new Set([...(editLogExtra||[]),...ticked])];
   closeEditAcc();
   openWearing(editAccOutfitId,pendingWearDateStr);
 }
@@ -2000,7 +2005,7 @@ function openWearing(outfitId,dateOverride){
       let linkedIds=accByCat[cat]||[];
       if(editingLogId){
         // Editing a past log: outfit links plus everything already chosen for that day, no weather filter
-        const extra=(editLogSelection||[]).filter(id=>{const it=getItem(id);return it&&it.cat===cat&&!linkedIds.includes(id);});
+        const extra=(editLogExtra||[]).filter(id=>{const it=getItem(id);return it&&it.cat===cat&&!linkedIds.includes(id);});
         linkedIds=[...linkedIds,...extra];
       }
       let linked=linkedIds.map(id=>getItem(id)).filter(Boolean);
@@ -2137,6 +2142,7 @@ function closeWearing(){
   document.getElementById('wearing-screen').classList.remove('open');
   editingLogId=null;
   editLogSelection=null;
+  editLogExtra=null;
   wearingOutfitId=null;
   isWearingLovedOutfit=false;
   lovedOutfitAccessories=[];
