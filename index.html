@@ -347,7 +347,7 @@ html.force-dark-mode{
 .password-form button:hover{background:var(--sage-dark);}
 .password-error{color:var(--rose);font-size:12px;margin-top:0.5rem;min-height:16px;}
 .titem.blocked{opacity:.3;}
-@supports (-webkit-touch-callout:none){input,textarea,select{font-size:16px !important;}}
+@supports (-webkit-touch-callout:none){input[type=text],input[type=url],input[type=search],input[type=password],input[type=email],input[type=number],input:not([type]),textarea{font-size:16px !important;}}
 </style>
 </head>
 <body>
@@ -433,8 +433,8 @@ html.force-dark-mode{
   <div id="view-outfits" class="view">
     <div class="outfits-controls" style="flex-wrap:nowrap;gap:4px;overflow-x:auto;">
       <select class="wdropdown" id="outfits-sort-select" onchange="onOutfitsSortChange(this)" style="font-size:11px;padding:5px 22px 5px 8px;">
-        <option value="score-high">Highest score</option>
-        <option value="score-low">Lowest score</option>
+        <option value="score-high">H score</option>
+        <option value="score-low">L score</option>
         <option value="most">Most worn</option>
         <option value="least">Least worn</option>
         <option value="newest">Newest</option>
@@ -844,7 +844,7 @@ let wardrobeTypeIdx=0;
 
 // Outfits sort/type state
 const OUTFITS_SORTS=['score-high','score-low','most','least','newest','oldest'];
-const OUTFITS_SORT_LABELS=['Highest score','Lowest score','Most worn','Least worn','Newest','Oldest'];
+const OUTFITS_SORT_LABELS=['H score','L score','Most worn','Least worn','Newest','Oldest'];
 let outfitsSortIdx=0;
 
 const OUTFITS_TYPES=['everyday','all','work','occasion','unavailable'];
