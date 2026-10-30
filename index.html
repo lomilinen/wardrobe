@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Wardrobe">
@@ -134,7 +134,6 @@ html.force-dark-mode{
 .acc-edit-thumb{width:60px;height:60px;border-radius:var(--rsm);background:var(--warm);border:2px solid var(--border);overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:24px;transition:border-color .15s;}
 .acc-edit-thumb img{width:100%;height:100%;object-fit:contain;}
 .acc-edit-item.linked .acc-edit-thumb{border-color:var(--sage);box-shadow:0 0 0 1px var(--sage);}
-.acc-edit-item.olinked:not(.linked) .acc-edit-thumb{border:2px dashed var(--sage);}
 .acc-edit-item.greyed{opacity:.75;}
 .acc-edit-item.greyed .acc-edit-thumb{background:var(--border-mid);}
 .acc-edit-item.greyed .acc-edit-thumb img{opacity:.5;filter:grayscale(1);}
@@ -517,7 +516,7 @@ html.force-dark-mode{
   <button class="edit-acc-back" onclick="closeEditAcc()">&#8592; Back</button>
   <div class="edit-acc-title">Edit accessories</div>
   <div id="edit-acc-content"></div>
-  <button class="acc-edit-save-btn" onclick="editingLogId?saveEditAccForLog():saveEditAcc()">Save</button>
+  <button class="acc-edit-save-btn" onclick="saveEditAcc()">Save</button>
 </div>
 
 <!-- OUTFIT DETAIL SCREEN -->
@@ -897,6 +896,17 @@ function cycleOutfitsType(){
   btn.classList.toggle('active',outfitsTypeIdx>0);
   renderOutfits();
 }
+
+// ===== BROKEN IMAGE PLACEHOLDER =====
+// If a Drive photo link fails to load, show a neutral placeholder instead of a blank space
+const IMG_PLACEHOLDER='data:image/svg+xml;utf8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="8" fill="#E7E2DA"/><circle cx="23" cy="22" r="5" fill="#B9B2A7"/><path d="M12 50l14-16 10 11 7-8 9 13z" fill="#B9B2A7"/></svg>');
+document.addEventListener('error',e=>{
+  const t=e.target;
+  if(t&&t.tagName==='IMG'&&!t.hasAttribute('onerror')&&!t.dataset.broken){
+    t.dataset.broken='1';
+    t.src=IMG_PLACEHOLDER;
+  }
+},true);
 
 // ===== API =====
 const USE_POST=true; // true: key and data travel in the request body. false: falls back to GET (key would then be in the URL)
@@ -1281,6 +1291,18 @@ function inferOutfitSeasons(pieceIds){
     intersection=new Set([...intersection].filter(x=>s.has(x)));
   }
   return intersection.size>0?intersection:null; // null if empty intersection = show everything
+}
+
+// True when 2+ season-tagged core pieces share no common season (accessories then can't be season-filtered)
+function outfitSeasonsConflict(pieceIds){
+  const tagged=pieceIds.map(id=>getItem(id)).filter(Boolean).filter(p=>(p.seasons||[]).length>0);
+  if(tagged.length<2)return false;
+  let inter=new Set(tagged[0].seasons);
+  for(let i=1;i<tagged.length;i++){
+    const set=new Set(tagged[i].seasons);
+    inter=new Set([...inter].filter(x=>set.has(x)));
+  }
+  return inter.size===0;
 }
 
 // Check if an accessory is compatible with a given outfit's inferred seasons
@@ -1768,33 +1790,24 @@ function openEditAccFromDetail(){
   if(!o)return;
   editAccOutfitId=currentOutfitDetailId;
   editAccState={};
-  // If editing a log, pre-select what was actually worn that day
-  // If editing the outfit itself, pre-select all linked accessories
-  if(editingLogId){
-    const log=wornLogs.find(l=>l.id===editingLogId);
-    const wornAccs=editLogSelection||(log?log.accessories||[]:[]);
-    ACC_CATS.forEach(cat=>{
-      editAccState[cat]=wornAccs.filter(id=>{const it=getItem(id);return it&&it.cat===cat;});
-    });
-  } else {
-    ACC_CATS.forEach(cat=>{editAccState[cat]=[...(o.accByCat[cat]||[])];});
-  }
+  // Always the outfit's own saved accessories, whichever screen you came from (outfit detail, wearing, or editing a logged day)
+  ACC_CATS.forEach(cat=>{editAccState[cat]=[...(o.accByCat[cat]||[])];});
 
   // Infer outfit seasons from core pieces for greying
   const outfitSeasons=inferOutfitSeasons(o.pieces||[]);
 
   const content=document.getElementById('edit-acc-content');
   content.innerHTML='';
-  if(editingLogId){
-    const note=document.createElement('div');
-    note.style.cssText='font-size:12px;color:var(--ink-muted);margin-bottom:1rem;';
-    note.textContent='Editing this day only. Solid green = worn that day, dashed green = linked to this outfit. Items you tick are added as options; pick what you wore on the next screen. The outfit\'s saved accessories will not change.';
-    content.appendChild(note);
-  }
   const previewDiv=document.createElement('div');
   previewDiv.style.cssText='margin-bottom:1.25rem;max-width:200px;';
   previewDiv.innerHTML=buildFlatlayCore(editAccOutfitId);
   content.appendChild(previewDiv);
+  if(outfitSeasonsConflict(o.pieces||[])){
+    const sNote=document.createElement('div');
+    sNote.style.cssText='font-size:12px;color:var(--ink-muted);margin:-0.5rem 0 1rem;';
+    sNote.textContent="This outfit's pieces share no common season, so accessories are not season-filtered.";
+    content.appendChild(sNote);
+  }
 
   ACC_CATS.forEach(cat=>{
     const allCatItems=items.filter(i=>i.cat===cat);
@@ -1804,15 +1817,14 @@ function openEditAccFromDetail(){
     const linkedCount=(editAccState[cat]||[]).length;
     div.innerHTML=`<div class="acc-edit-cat-header" onclick="toggleEditAccSection('eacc-cat-${cat}',this)">
         ${CATS[cat].label}
-        <span class="acc-count-pill">${editingLogId?`${linkedCount} worn · ${(o.accByCat[cat]||[]).length} linked · ${allCatItems.length} total`:`${linkedCount} linked · ${allCatItems.length} total`}</span>
+        <span class="acc-count-pill">${linkedCount} linked · ${allCatItems.length} total</span>
         <span class="acc-arrow">▸</span>
       </div>
       <div class="acc-edit-options" id="eacc-cat-${cat}">
         ${allCatItems.map(a=>{
           const isLinked=(editAccState[cat]||[]).includes(a.id);
-          const isOutfitLinked=!!editingLogId&&(o.accByCat[cat]||[]).includes(a.id);
           const isGreyed=!accCompatibleWithOutfit(a,outfitSeasons);
-          return`<div class="acc-edit-item${isLinked?' linked':''}${isOutfitLinked&&!isLinked?' olinked':''}${isGreyed?' greyed':''}" id="eacc-${cat}-${a.id}" onclick="toggleEditAcc('${cat}','${a.id}')">
+          return`<div class="acc-edit-item${isLinked?' linked':''}${isGreyed?' greyed':''}" id="eacc-${cat}-${a.id}" onclick="toggleEditAcc('${cat}','${a.id}')">
             <div class="acc-edit-thumb">${a.img?`<img src="${a.img}" loading="lazy">`:`<span>${a.emoji||'💍'}</span>`}</div>
           </div>`;
         }).join('')}
@@ -1880,6 +1892,8 @@ async function saveEditAcc(){
     accSummary.insertBefore(hint,accSummary.firstChild);
   }
   closeEditAcc();
+  // Editing a logged day: go back to that day's screen. New links appear as options (not auto-selected) and what was ticked stays ticked.
+  if(editingLogId&&wearingOutfitId)openWearing(editAccOutfitId,pendingWearDateStr);
   try{
     showSavingOverlay();
     const res=await apiCall({action:'updateOutfit',data:{...o,accByCat:JSON.stringify(o.accByCat)}});
@@ -1911,17 +1925,6 @@ function editLogAccFromSheet(logId,outfitId){
   editLogExtra=[...(log.accessories||[])];
   closeDayDetail();
   openWearing(outfitId,log.date);
-}
-
-function saveEditAccForLog(){
-  // Past-log edit: ticked items become options on the wearing screen, but newly ticked ones are NOT auto-selected.
-  // Items that were already worn stay selected unless you unticked them. Nothing is saved until "Update log",
-  // and the outfit's own saved accessories are never changed from here.
-  const ticked=Object.values(editAccState).flat();
-  editLogSelection=(editLogSelection||[]).filter(id=>ticked.includes(id));
-  editLogExtra=[...new Set([...(editLogExtra||[]),...ticked])];
-  closeEditAcc();
-  openWearing(editAccOutfitId,pendingWearDateStr);
 }
 
 async function deleteOutfitFromDetail(){
