@@ -433,8 +433,10 @@ html.force-dark-mode{
   <div id="view-outfits" class="view">
     <div class="outfits-controls" style="flex-wrap:nowrap;gap:4px;overflow-x:auto;">
       <select class="wdropdown" id="outfits-sort-select" onchange="onOutfitsSortChange(this)" style="font-size:11px;padding:5px 22px 5px 8px;">
-        <option value="least">Least worn</option>
+        <option value="score-high">Highest score</option>
+        <option value="score-low">Lowest score</option>
         <option value="most">Most worn</option>
+        <option value="least">Least worn</option>
         <option value="newest">Newest</option>
         <option value="oldest">Oldest</option>
       </select>
@@ -841,8 +843,8 @@ const WARDROBE_TYPE_LABELS=['All types','Everyday','💼 Work','🎉 Occasion','
 let wardrobeTypeIdx=0;
 
 // Outfits sort/type state
-const OUTFITS_SORTS=['least','most','newest','oldest'];
-const OUTFITS_SORT_LABELS=['Least worn','Most worn','Newest','Oldest'];
+const OUTFITS_SORTS=['score-high','score-low','most','least','newest','oldest'];
+const OUTFITS_SORT_LABELS=['Highest score','Lowest score','Most worn','Least worn','Newest','Oldest'];
 let outfitsSortIdx=0;
 
 const OUTFITS_TYPES=['everyday','all','work','occasion','unavailable'];
@@ -1500,8 +1502,56 @@ function outfitsChangePage(dir){
 }
 
 // ===== OUTFITS TAB =====
+// ===== OUTFIT WEAR COUNT + ORDERING HELPERS =====
+// Real count: number of logs for each outfit
+function outfitWearCounts(){
+  const c={};
+  wornLogs.forEach(l=>{c[l.outfitId]=(c[l.outfitId]||0)+1;});
+  return c;
+}
+function outfitWearCount(id){return outfitWearCounts()[id]||0;}
+// Stable per-day pseudo-random number: breaks ties differently each day but never reshuffles while you browse
+function dayRand(id){
+  const str=id+todayStr();
+  let h=0;
+  for(let i=0;i<str.length;i++)h=(h*31+str.charCodeAt(i))>>>0;
+  return h;
+}
+// Re-order a ranked list so outfits sharing pieces are not shown right next to each other.
+// An outfit can move up at most (lookahead-1) places, and (when a score is given) only past outfits whose score
+// is within `tol` points of it, so the ranking stays intact and a big score gap is never jumped.
+function spreadSimilar(list,lookahead,gap,scoreFn,tol){
+  const pool=list.slice(),out=[];
+  while(pool.length){
+    const recent=new Set(out.slice(-gap).flatMap(o=>o.pieces||[]));
+    const lim=Math.min(lookahead,pool.length);
+    const base=scoreFn?scoreFn(pool[0]):0;
+    let idx=0;
+    for(let i=0;i<lim;i++){
+      if(scoreFn&&Math.abs(scoreFn(pool[i])-base)>tol)break; // list is sorted, so everything after is even further away
+      if(!(pool[i].pieces||[]).some(p=>recent.has(p))){idx=i;break;}
+    }
+    out.push(pool.splice(idx,1)[0]);
+  }
+  return out;
+}
+// Same idea, but only inside groups with an identical sort value (keeps counts strictly ordered)
+function spreadWithinTies(list,keyFn){
+  const out=[];
+  let i=0;
+  while(i<list.length){
+    let j=i;
+    const k=keyFn(list[i]);
+    while(j<list.length&&keyFn(list[j])===k)j++;
+    const group=list.slice(i,j);
+    out.push(...(group.length>2?spreadSimilar(group,Math.min(group.length,60),3):group));
+    i=j;
+  }
+  return out;
+}
+
 function renderOutfits(){
-  const sort=OUTFITS_SORTS[outfitsSortIdx]||'least';
+  const sort=OUTFITS_SORTS[outfitsSortIdx]||'score-high';
   const typeFilter=OUTFITS_TYPES[outfitsTypeIdx]||'';
   // Sync dropdown to current filter
   const dropdown=document.getElementById('outfits-type-select');
@@ -1550,8 +1600,19 @@ function renderOutfits(){
       const bTs=parseInt(((b.id||'').replace(/^o/,'')).substring(0,13))||0;
       return sort==='newest'?bTs-aTs:aTs-bTs;
     });
+  } else if(sort==='most'||sort==='least'){
+    // Real wear count; ties are shuffled (stable per day) and spread so outfits sharing pieces are not side by side
+    const cnt=outfitWearCounts();
+    const n=o=>cnt[o.id]||0;
+    outfitsFiltered.sort((a,b)=>{const d=sort==='most'?n(b)-n(a):n(a)-n(b);return d!==0?d:dayRand(a.id)-dayRand(b.id);});
+    outfitsFiltered=spreadWithinTies(outfitsFiltered,n);
   } else {
-    outfitsFiltered.sort((a,b)=>{const d=sort==='most'?score(a)-score(b):score(b)-score(a);return d!==0?d:a.id.localeCompare(b.id);});
+    // Same score the calendar suggestions use. Everyday and Work are day-aware (weekday/weekend work rules for today);
+    // All outfits, Occasion and Unavailable are a neutral overview with no day context.
+    const dayCtx=(typeFilter==='everyday'||typeFilter==='work')?todayStr():undefined;
+    const sc=new Map(outfitsFiltered.map(o=>[o.id,score(o,dayCtx)]));
+    outfitsFiltered.sort((a,b)=>{const d=sort==='score-low'?sc.get(a.id)-sc.get(b.id):sc.get(b.id)-sc.get(a.id);return d!==0?d:dayRand(a.id)-dayRand(b.id);});
+    outfitsFiltered=spreadSimilar(outfitsFiltered,12,3,o=>sc.get(o.id),20);
   }
   renderOutfitsPage();
 }
@@ -2546,7 +2607,7 @@ function renderPairedOutfits(){
     }
     return`<div class="paired-outfit-card${isMarked?' marked-remove':''}${isBulkSel?' outfit-card-selected':''}${isUnavailablePaired?' icard-unavailable':''}" onclick="${clickAction}">
       ${flHtml||'<div style="height:40px;display:flex;align-items:center;justify-content:center;font-size:18px;">👗</div>'}
-      <div style="font-size:8px;color:var(--ink-muted);text-align:center;margin-top:4px;">${o.wornCount||0}x ${daysSince(o.lastWorn)}d ago</div>
+      <div style="font-size:8px;color:var(--ink-muted);text-align:center;margin-top:4px;">${outfitWearCount(o.id)}x ${daysSince(o.lastWorn)}d ago</div>
       ${isMarked?'<div class="paired-remove-badge">Unlink</div>':''}
       ${isBulkSel?'<div class="paired-remove-badge" style="background:var(--sage);">✓</div>':''}
       ${!pairedBulkMode?`<button class="paired-outfit-open-btn" onclick="event.stopPropagation();openOutfitFromItem('${o.id}')">Open</button>`:''}
