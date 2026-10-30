@@ -346,6 +346,8 @@ html.force-dark-mode{
 .password-form button{width:100%;padding:10px 12px;background:var(--sage);color:var(--cream);border:none;border-radius:var(--rsm);font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;cursor:pointer;transition:background .2s;}
 .password-form button:hover{background:var(--sage-dark);}
 .password-error{color:var(--rose);font-size:12px;margin-top:0.5rem;min-height:16px;}
+.titem.blocked{opacity:.3;}
+@supports (-webkit-touch-callout:none){input,textarea,select{font-size:16px !important;}}
 </style>
 </head>
 <body>
@@ -2828,7 +2830,13 @@ function renderCurateStep(){
 
   // Grid
   const gridEl=document.getElementById('curate-grid');
-  gridEl.innerHTML=step.pool.map(it=>`
+  // Only offer pieces that share a season with the pieces already chosen (otherwise the outfit could never be suggested)
+  const seasonBase=(step.context&&step.context.length)?step.context:[curateItemId];
+  const offered=step.pool.filter(it=>!outfitSeasonsConflict([...seasonBase,it.id]));
+  if(!offered.length){
+    gridEl.innerHTML='<div style="grid-column:1/-1;padding:2rem 1rem;text-align:center;font-size:13px;color:var(--ink-muted);">Nothing here shares a season with these pieces. Tap Skip.</div>';
+  }
+  else gridEl.innerHTML=offered.map(it=>`
     <div class="curate-item" id="ci-${it.id}" onclick="toggleCurateItem('${it.id}')">
       ${it.img?`<img src="${it.img}" loading="lazy">`:`<span style="font-size:24px;">${it.emoji||'👕'}</span>`}
     </div>`).join('');
@@ -2893,7 +2901,7 @@ async function curateNext(){
       showSavingOverlay();
       for(const id of selected){
         const pieces=[...step.pairPieces,id];
-        if(!isDuplicateOutfit(pieces)){
+        if(!isDuplicateOutfit(pieces)&&!outfitSeasonsConflict(pieces)){
           curateSavePair(pieces);
           const outfit=curateSavedOutfits[curateSavedOutfits.length-1];
           const res=await apiCall({action:'saveOutfit',data:{...outfit,accByCat:JSON.stringify(outfit.accByCat)}});
@@ -2911,7 +2919,7 @@ async function curateNext(){
       showSavingOverlay();
       for(const dId of selected){
         const pieces=[dId,curateItemId];
-        if(!isDuplicateOutfit(pieces)){
+        if(!isDuplicateOutfit(pieces)&&!outfitSeasonsConflict(pieces)){
           curateSavePair(pieces);
           const outfit=curateSavedOutfits[curateSavedOutfits.length-1];
           const res=await apiCall({action:'saveOutfit',data:{...outfit,accByCat:JSON.stringify(outfit.accByCat)}});
@@ -2929,7 +2937,7 @@ async function curateNext(){
       showSavingOverlay();
       for(const jId of selected){
         const pieces=[curateItemId,jId];
-        if(!isDuplicateOutfit(pieces)){
+        if(!isDuplicateOutfit(pieces)&&!outfitSeasonsConflict(pieces)){
           curateSavePair(pieces);
           const outfit=curateSavedOutfits[curateSavedOutfits.length-1];
           const res=await apiCall({action:'saveOutfit',data:{...outfit,accByCat:JSON.stringify(outfit.accByCat)}});
@@ -3007,11 +3015,40 @@ function toggleBuildSection(id,titleEl){
       </div>`).join('');
     body.style.display='flex';
     arrow.textContent='▾';
+    applyBuilderSeasonBlocking();
   }
+}
+
+// Pieces already chosen in the builder, leaving out the one a new pick in this category would replace
+function builderPiecesExcept(cat){
+  const ids=[];
+  Object.entries(builderSel).forEach(([c,val])=>{
+    if(c===cat&&c!=='tops')return;
+    if(Array.isArray(val)){
+      let arr=val;
+      if(c===cat&&arr.length>=2)arr=arr.slice(1);
+      arr.forEach(i=>ids.push(i));
+    }else ids.push(val);
+  });
+  return ids;
+}
+// Dim pieces that would leave the outfit with no common season (it could never be suggested)
+function applyBuilderSeasonBlocking(){
+  document.querySelectorAll('#builder-left .titem').forEach(el=>{
+    const id=el.id.replace('tog-','');
+    const it=getItem(id);
+    if(!it)return;
+    const blocked=!el.classList.contains('active')&&outfitSeasonsConflict([...builderPiecesExcept(it.cat),id]);
+    el.classList.toggle('blocked',blocked);
+  });
 }
 
 function togglePiece(id,cat){
   const el=document.getElementById('tog-'+id);
+  if(el&&!el.classList.contains('active')&&outfitSeasonsConflict([...builderPiecesExcept(cat),id])){
+    showToast('No common season with the pieces already chosen');
+    return;
+  }
   if(cat==='tops'){
     // Allow up to 2 tops
     if(!builderSel.tops)builderSel.tops=[];
@@ -3036,6 +3073,7 @@ function togglePiece(id,cat){
   }
   updatePreview();
   applyAccGreyingInBuilder();
+  applyBuilderSeasonBlocking();
 }
 
 // ITEM 4: grey out accessories in builder that don't match outfit's inferred seasons
@@ -3135,6 +3173,10 @@ async function saveOutfit(){
   if(!pieces.length)return;
   if(isDuplicateOutfit(pieces)){
     showToast('This outfit already exists — same pieces found.');
+    return;
+  }
+  if(outfitSeasonsConflict(pieces)){
+    showToast('These pieces share no common season, so this outfit would never be suggested.');
     return;
   }
   const accByCat={};
