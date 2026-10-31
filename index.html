@@ -1503,6 +1503,10 @@ function outfitsChangePage(dir){
 
 // ===== OUTFITS TAB =====
 // ===== OUTFIT WEAR COUNT + ORDERING HELPERS =====
+// True when any core piece was worn in the last 5 days (the same window score() penalises)
+function outfitRecentlyWorn(o){
+  return (o.pieces||[]).some(id=>{const it=getItem(id);return it&&daysSince(it.lastWorn)<6;});
+}
 // Real count: number of logs for each outfit
 function outfitWearCounts(){
   const c={};
@@ -1517,21 +1521,23 @@ function dayRand(id){
   for(let i=0;i<str.length;i++)h=(h*31+str.charCodeAt(i))>>>0;
   return h;
 }
-// Re-order a ranked list so outfits sharing pieces are not shown right next to each other.
-// An outfit can move up at most (lookahead-1) places, and (when a score is given) only past outfits whose score
-// is within `tol` points of it, so the ranking stays intact and a big score gap is never jumped.
-function spreadSimilar(list,lookahead,gap,scoreFn,tol){
+// Re-order a ranked list so no single piece takes over: a piece cannot reappear within `window` outfits.
+// Looks at most `lookahead` places down for the next outfit that qualifies (if none does, the one with the fewest repeats wins).
+// With `tierFn`, an outfit never jumps ahead of one in a different tier (e.g. work vs non-work on a weekday).
+function spreadSimilar(list,lookahead,window,tierFn){
   const pool=list.slice(),out=[];
   while(pool.length){
-    const recent=new Set(out.slice(-gap).flatMap(o=>o.pieces||[]));
+    const recent=new Set(out.slice(-window).flatMap(o=>o.pieces||[]));
     const lim=Math.min(lookahead,pool.length);
-    const base=scoreFn?scoreFn(pool[0]):0;
-    let idx=0;
+    const tier=tierFn?tierFn(pool[0]):null;
+    let best=0,bestOv=Infinity;
     for(let i=0;i<lim;i++){
-      if(scoreFn&&Math.abs(scoreFn(pool[i])-base)>tol)break; // list is sorted, so everything after is even further away
-      if(!(pool[i].pieces||[]).some(p=>recent.has(p))){idx=i;break;}
+      if(tierFn&&tierFn(pool[i])!==tier)continue;
+      const ov=(pool[i].pieces||[]).filter(p=>recent.has(p)).length;
+      if(ov===0){best=i;break;}
+      if(ov<bestOv){bestOv=ov;best=i;}
     }
-    out.push(pool.splice(idx,1)[0]);
+    out.push(pool.splice(best,1)[0]);
   }
   return out;
 }
@@ -1544,7 +1550,7 @@ function spreadWithinTies(list,keyFn){
     const k=keyFn(list[i]);
     while(j<list.length&&keyFn(list[j])===k)j++;
     const group=list.slice(i,j);
-    out.push(...(group.length>2?spreadSimilar(group,Math.min(group.length,60),3):group));
+    out.push(...(group.length>2?spreadSimilar(group,Math.min(group.length,80),6):group));
     i=j;
   }
   return out;
@@ -1612,7 +1618,8 @@ function renderOutfits(){
     const dayCtx=(typeFilter==='everyday'||typeFilter==='work')?todayStr():undefined;
     const sc=new Map(outfitsFiltered.map(o=>[o.id,score(o,dayCtx)]));
     outfitsFiltered.sort((a,b)=>{const d=sort==='score-low'?sc.get(a.id)-sc.get(b.id):sc.get(b.id)-sc.get(a.id);return d!==0?d:dayRand(a.id)-dayRand(b.id);});
-    outfitsFiltered=spreadSimilar(outfitsFiltered,12,3,o=>sc.get(o.id),20);
+    // Tiers: an outfit never jumps ahead of one that sits in a different tier (work vs non-work on a weekday, or worn in the last 5 days)
+    outfitsFiltered=spreadSimilar(outfitsFiltered,80,6,o=>(dayCtx&&isWorkOutfit(o)?2:0)+(outfitRecentlyWorn(o)?1:0));
   }
   renderOutfitsPage();
 }
