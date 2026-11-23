@@ -929,10 +929,14 @@ async function apiCall(params,keyOverride){
       Object.entries(flat).forEach(([k,v])=>url.searchParams.set(k,v));
       r=await fetch(url);
     }
-    const res=await r.json();
+    const text=await r.text();
+    let res;
+    try{res=JSON.parse(text);}
+    catch(parseErr){return{error:`The server sent an unexpected reply (status ${r.status}). Check the Apps Script deployment.`};}
+    if(!r.ok&&!(res&&res.error))return{error:`Server error (status ${r.status})`};
     if(res&&res.error==='Unauthorized'&&keyOverride===undefined)lockApp();
     return res;
-  }catch(e){return{error:e.toString()};}
+  }catch(e){return{error:'Network problem: '+(e&&e.message?e.message:e)};}
 }
 function showSaving(){
   const el=document.getElementById('saving');
@@ -1085,7 +1089,6 @@ async function init(){
   // Load from cache immediately so app is usable
   const cache=loadCache();
   if(cache){
-    const ageMs=Date.now()-cache.ts;
     items=Array.isArray(cache.itemsData)?cache.itemsData.map(normalizeItem):[];
     wornLogs=Array.isArray(cache.logsData)?cache.logsData:[];
     outfits=Array.isArray(cache.outfitsData)?cache.outfitsData.map(normalizeOutfit):[];
@@ -1121,7 +1124,11 @@ async function init(){
       renderWardrobe();
       setDotStatus('fresh'); // green — fresh data loaded
     } else {
-      setDotStatus(cache?'loading':'error');
+      // At least one load failed: keep the saved copy, turn the dot red, and say what failed
+      const failed=[!freshItems&&'items',!freshLogs&&'logs',!freshOutfits&&'outfits'].filter(Boolean);
+      setDotStatus('error');
+      const locked=[ir,lr,or].some(r=>r&&r.error==='Unauthorized');
+      if(!locked)showToast('Could not load '+failed.join(', ')+(cache?'. Showing your saved copy.':'.'));
     }
   } catch(e){
     console.warn('Fetch failed, using cache',e);
@@ -1224,10 +1231,14 @@ function score(o,dateStr){
     const recentPieces=ps.filter(p=>daysSince(p.lastWorn)<6);
     if(recentPieces.length>0){
       const freshestDaysAgo=Math.min(...recentPieces.map(p=>daysSince(p.lastWorn)));
+      // Decisive: bigger than the largest possible freshness score (a never-worn piece counts as 999 days),
+      // so any outfit with a piece worn in the last 5 days ranks below every outfit without one.
+      // The three steps keep "worn today" lowest. From 6 days ago on there is no penalty at all.
+      const RECENT_WEAR_BASE=5000;
       let penalty=0;
-      if(freshestDaysAgo===0)penalty=-200;
-      else if(freshestDaysAgo<=3)penalty=-120;
-      else if(freshestDaysAgo<=5)penalty=-75;
+      if(freshestDaysAgo===0)penalty=-(RECENT_WEAR_BASE+200);
+      else if(freshestDaysAgo<=3)penalty=-(RECENT_WEAR_BASE+120);
+      else if(freshestDaysAgo<=5)penalty=-(RECENT_WEAR_BASE+75);
       itemScore+=penalty;
     }
   }
@@ -1503,10 +1514,6 @@ function outfitsChangePage(dir){
 
 // ===== OUTFITS TAB =====
 // ===== OUTFIT WEAR COUNT + ORDERING HELPERS =====
-// True when any core piece was worn in the last 5 days (the same window score() penalises)
-function outfitRecentlyWorn(o){
-  return (o.pieces||[]).some(id=>{const it=getItem(id);return it&&daysSince(it.lastWorn)<6;});
-}
 // Real count: number of logs for each outfit
 function outfitWearCounts(){
   const c={};
@@ -1618,8 +1625,9 @@ function renderOutfits(){
     const dayCtx=(typeFilter==='everyday'||typeFilter==='work')?todayStr():undefined;
     const sc=new Map(outfitsFiltered.map(o=>[o.id,score(o,dayCtx)]));
     outfitsFiltered.sort((a,b)=>{const d=sort==='score-low'?sc.get(a.id)-sc.get(b.id):sc.get(b.id)-sc.get(a.id);return d!==0?d:dayRand(a.id)-dayRand(b.id);});
-    // Tiers: an outfit never jumps ahead of one that sits in a different tier (work vs non-work on a weekday, or worn in the last 5 days)
-    outfitsFiltered=spreadSimilar(outfitsFiltered,80,6,o=>(dayCtx&&isWorkOutfit(o)?2:0)+(outfitRecentlyWorn(o)?1:0));
+    // Strict score order: no outfit is ever placed above one with a higher score.
+    // Only outfits with exactly the same score are spread so outfits sharing pieces are not side by side.
+    outfitsFiltered=spreadWithinTies(outfitsFiltered,o=>sc.get(o.id));
   }
   renderOutfitsPage();
 }
@@ -3258,7 +3266,7 @@ async function saveOutfit(){
     accessories:Object.values(accByCat).flat(),
     accByCat:JSON.stringify(accByCat),
     seasons:[],conditions:[],
-    lastWorn:daysAgo(30)
+    lastWorn:''
   };
   outfits=outfits.filter(x=>x.id!=='__preview__');
   outfits.push({...outfit,accByCat});
@@ -3441,10 +3449,24 @@ function getVariedSuggestions(pool,max,dateStr){
     return'other';
   }
 
+  // Sharing rule: across the picks at most ONE piece may be shared, and no piece may appear in all 3
+  const useCount=new Map();
+  function sharingOk(o){
+    let newShared=0;
+    for(const pid of (o.pieces||[])){
+      const c=useCount.get(pid)||0;
+      if(c>=2)return false;
+      if(c===1)newShared++;
+    }
+    let alreadyShared=0;
+    useCount.forEach(v=>{if(v>=2)alreadyShared++;});
+    return alreadyShared+newShared<=1;
+  }
+  function addUse(o){(o.pieces||[]).forEach(pid=>useCount.set(pid,(useCount.get(pid)||0)+1));}
+
   for(const o of sorted){
     if(picks.length>=max)break;
-    const sharesWithAny=picks.some(p=>p.pieces.some(pid=>(o.pieces||[]).includes(pid)));
-    if(!sharesWithAny){
+    if(sharingOk(o)){
       // Change 5: never all dresses or all bottoms in the 3 slots
       const candidateType=dominantType(o);
       if(picks.length>=2){
@@ -3452,6 +3474,7 @@ function getVariedSuggestions(pool,max,dateStr){
         if(allSameType&&(candidateType==='dress'||candidateType==='bottoms'))continue;
       }
       picks.push(o);
+      addUse(o);
       (o.pieces||[]).forEach(p=>usedPieces.add(p));
     }
   }
@@ -3646,23 +3669,31 @@ function closeDayDetail(){document.getElementById('day-detail').classList.remove
 // ===== RECALCULATE WORN STATS (run recalculateWornStats() from console to fix historical data) =====
 async function recalculateWornStats(){
   console.log("Recalculating worn stats from logs...");
-  const savePromises=[];
+  const jobs=[];
   outfits.filter(o=>o.id!=="__preview__").forEach(outfit=>{
     const outfitLogs=wornLogs.filter(l=>l.outfitId===outfit.id);
     outfit.lastWorn=outfitLogs.length?outfitLogs.reduce((latest,l)=>l.date>latest?l.date:latest,""):"";
-    savePromises.push(apiCall({action:"updateOutfit",data:{...outfit,accByCat:JSON.stringify(outfit.accByCat)}}));
+    jobs.push(()=>apiCall({action:"updateOutfit",data:{...outfit,accByCat:JSON.stringify(outfit.accByCat)}}));
   });
   items.forEach(item=>{
     const itemLogs=wornLogs.filter(l=>[...(l.pieces||[]),...(l.accessories||[])].includes(item.id));
     item.wornCount=itemLogs.length;
     item.lastWorn=itemLogs.length?itemLogs.reduce((latest,l)=>l.date>latest?l.date:latest,""):"";
-    savePromises.push(apiCall({action:"updateItem",data:item}));
+    jobs.push(()=>apiCall({action:"updateItem",data:item}));
   });
   showSaving();
-  await Promise.all(savePromises);
+  // A few requests at a time with a short pause, so Apps Script is not flooded
+  const BATCH=5;
+  let failed=0;
+  for(let i=0;i<jobs.length;i+=BATCH){
+    const results=await Promise.all(jobs.slice(i,i+BATCH).map(job=>job()));
+    failed+=results.filter(r=>r&&r.error).length;
+    console.log(`Saved ${Math.min(i+BATCH,jobs.length)} of ${jobs.length}`);
+    await new Promise(r=>setTimeout(r,150));
+  }
   renderWardrobe();
   renderOutfits();
-  showToast("Worn stats recalculated!");
+  showToast(failed?`Recalculated, but ${failed} saves failed. Run it again.`:"Worn stats recalculated!");
   console.log("Done.");
 }
 // ===== TRIPS =====
