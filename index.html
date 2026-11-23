@@ -737,6 +737,7 @@ function bootFromCache(){
     items=Array.isArray(cache.itemsData)?cache.itemsData.map(normalizeItem):[];
     wornLogs=Array.isArray(cache.logsData)?cache.logsData:[];
     outfits=Array.isArray(cache.outfitsData)?cache.outfitsData.map(normalizeOutfit):[];
+    settleWornStats();
     renderCalendar();
     renderWardrobe();
   }
@@ -1092,6 +1093,7 @@ async function init(){
     items=Array.isArray(cache.itemsData)?cache.itemsData.map(normalizeItem):[];
     wornLogs=Array.isArray(cache.logsData)?cache.logsData:[];
     outfits=Array.isArray(cache.outfitsData)?cache.outfitsData.map(normalizeOutfit):[];
+    settleWornStats();
     renderCalendar();
     renderWardrobe();
     setDotStatus('loading'); // amber pulsing — cache shown, fetch in progress
@@ -1117,6 +1119,7 @@ async function init(){
       items=freshItems;
       wornLogs=freshLogs;
       outfits=freshOutfits;
+      settleWornStats();
       if(freshTrips)trips=freshTrips;
       saveCache(ir,or,lr);
       initOutfitsTypeIdx();
@@ -1200,10 +1203,41 @@ function switchTab(name,btn){
 // ===== HELPERS =====
 function getItem(id){return items.find(i=>i.id===id);}
 function daysAgo(n){const d=new Date();d.setDate(d.getDate()-n);return d.toISOString();}
-function daysSince(iso){if(!iso)return 999;return Math.round((Date.now()-new Date(iso))/86400000);}
+function daysSince(iso){
+  if(!iso)return 999;
+  const str=String(iso);
+  // A plain day (YYYY-MM-DD) is compared as whole calendar days, so a log for today reads "today" all day long
+  if(/^\d{4}-\d{2}-\d{2}$/.test(str))return Math.round((new Date(todayStr()+'T12:00:00')-new Date(str+'T12:00:00'))/86400000);
+  return Math.round((Date.now()-new Date(iso))/86400000);
+}
 function daysSinceLabel(iso){const d=daysSince(iso);if(d>=999)return'never worn';if(d===0)return'today';if(d===1)return'yesterday';return`${d}d ago`;}
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500);}
 function todayStr(){return new Date().toLocaleDateString('en-CA');}
+
+// Last worn and wear counts come from the logs. A log counts for the day it is FOR (never the day it was entered),
+// and only days that are today or earlier count, so a future-dated log changes nothing until its day arrives.
+// Items and outfits that appear in no log keep their stored values.
+function settleWornStats(){
+  const today=todayStr();
+  const itemLast={},itemCount={},outfitLast={},inItemLog=new Set(),inOutfitLog=new Set();
+  wornLogs.forEach(l=>{
+    const d=normaliseDate(l.date);
+    const ids=new Set([...(l.pieces||[]),...(l.accessories||[])]);
+    ids.forEach(id=>{
+      inItemLog.add(id);
+      if(d&&d<=today){
+        itemCount[id]=(itemCount[id]||0)+1;
+        if(!itemLast[id]||d>itemLast[id])itemLast[id]=d;
+      }
+    });
+    if(l.outfitId){
+      inOutfitLog.add(l.outfitId);
+      if(d&&d<=today&&(!outfitLast[l.outfitId]||d>outfitLast[l.outfitId]))outfitLast[l.outfitId]=d;
+    }
+  });
+  items.forEach(it=>{if(inItemLog.has(it.id)){it.wornCount=itemCount[it.id]||0;it.lastWorn=itemLast[it.id]||'';}});
+  outfits.forEach(o=>{if(inOutfitLog.has(o.id))o.lastWorn=outfitLast[o.id]||'';});
+}
 
 function isOccasionOutfit(o){
   return(o.pieces||[]).some(pid=>{const it=getItem(pid);return it&&it.occasion;});
@@ -1517,7 +1551,8 @@ function outfitsChangePage(dir){
 // Real count: number of logs for each outfit
 function outfitWearCounts(){
   const c={};
-  wornLogs.forEach(l=>{c[l.outfitId]=(c[l.outfitId]||0)+1;});
+  const today=todayStr();
+  wornLogs.forEach(l=>{const d=normaliseDate(l.date);if(d&&d<=today)c[l.outfitId]=(c[l.outfitId]||0)+1;});
   return c;
 }
 function outfitWearCount(id){return outfitWearCounts()[id]||0;}
@@ -1826,10 +1861,9 @@ async function confirmWornFromDetail(){
     pieces:o.pieces,accessories:chosenAccs,
     tempC:weather.tempC,condition:weather.condition,weatherLabel:weather.label
   };
-  o.lastWorn=new Date().toISOString();
   const allWorn=[...o.pieces,...chosenAccs];
-  allWorn.forEach(pid=>{const it=getItem(pid);if(it){it.lastWorn=new Date().toISOString();it.wornCount=(it.wornCount||0)+1;}});
   wornLogs.push(log);
+  settleWornStats(); // last worn and counts follow the day logged for
   suggestionCache={};
   suggestionPages={};
   suggestionPageIndex={};
@@ -2154,6 +2188,7 @@ async function confirmWorn(){
     if(existingLog){
       existingLog.accessories=chosenAccs;
       existingLog.date=document.getElementById('wearing-date-input').value||normaliseDate(existingLog.date)||logDate;
+      settleWornStats();
       editingLogId=null;
       closeWearing();
       renderCalendar();
@@ -2185,10 +2220,9 @@ async function confirmWorn(){
     pieces:o.pieces,accessories:chosenAccs,
     tempC:weather.tempC,condition:weather.condition,weatherLabel:weather.label
   };
-  o.lastWorn=new Date().toISOString();
   const allWorn=[...o.pieces,...chosenAccs];
-  allWorn.forEach(pid=>{const it=getItem(pid);if(it){it.lastWorn=new Date().toISOString();it.wornCount=(it.wornCount||0)+1;}});
   wornLogs.push(log);
+  settleWornStats(); // last worn and counts follow the day logged for
   closeWearing();
   renderCalendar();
   try{
@@ -3617,28 +3651,11 @@ async function deleteLog(logId,dateStr,isFuture){
   suggestionPages={};
   suggestionPageIndex={};
 
-  // Recalculate outfit lastWorn from remaining logs
+  // Recalculate last worn and wear counts from the remaining logs (days up to today only)
+  settleWornStats();
   const outfit=outfits.find(o=>o.id===log.outfitId);
-  if(outfit){
-    const outfitLogs=wornLogs.filter(l=>l.outfitId===outfit.id);
-    outfit.lastWorn=outfitLogs.length
-      ?outfitLogs.reduce((latest,l)=>l.date>latest?l.date:latest,'')
-      :'';
-  }
-
-  // Recalculate wornCount and lastWorn for every item referenced in the deleted log
   const affectedItemIds=[...new Set([...(log.pieces||[]),...(log.accessories||[])])];
-  const updatedItems=[];
-  affectedItemIds.forEach(itemId=>{
-    const item=getItem(itemId);
-    if(!item)return;
-    const itemLogs=wornLogs.filter(l=>[...(l.pieces||[]),...(l.accessories||[])].includes(itemId));
-    item.wornCount=itemLogs.length;
-    item.lastWorn=itemLogs.length
-      ?itemLogs.reduce((latest,l)=>l.date>latest?l.date:latest,'')
-      :'';
-    updatedItems.push(item);
-  });
+  const updatedItems=affectedItemIds.map(id=>getItem(id)).filter(Boolean);
 
   renderCalendar();
   closeDayDetail();
@@ -3669,16 +3686,17 @@ function closeDayDetail(){document.getElementById('day-detail').classList.remove
 // ===== RECALCULATE WORN STATS (run recalculateWornStats() from console to fix historical data) =====
 async function recalculateWornStats(){
   console.log("Recalculating worn stats from logs...");
+  settleWornStats();
+  // Anything in no log at all is reset to never worn
+  const usedItems=new Set(wornLogs.flatMap(l=>[...(l.pieces||[]),...(l.accessories||[])]));
+  const usedOutfits=new Set(wornLogs.map(l=>l.outfitId));
   const jobs=[];
   outfits.filter(o=>o.id!=="__preview__").forEach(outfit=>{
-    const outfitLogs=wornLogs.filter(l=>l.outfitId===outfit.id);
-    outfit.lastWorn=outfitLogs.length?outfitLogs.reduce((latest,l)=>l.date>latest?l.date:latest,""):"";
+    if(!usedOutfits.has(outfit.id))outfit.lastWorn="";
     jobs.push(()=>apiCall({action:"updateOutfit",data:{...outfit,accByCat:JSON.stringify(outfit.accByCat)}}));
   });
   items.forEach(item=>{
-    const itemLogs=wornLogs.filter(l=>[...(l.pieces||[]),...(l.accessories||[])].includes(item.id));
-    item.wornCount=itemLogs.length;
-    item.lastWorn=itemLogs.length?itemLogs.reduce((latest,l)=>l.date>latest?l.date:latest,""):"";
+    if(!usedItems.has(item.id)){item.wornCount=0;item.lastWorn="";}
     jobs.push(()=>apiCall({action:"updateItem",data:item}));
   });
   showSaving();
